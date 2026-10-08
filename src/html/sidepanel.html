@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>纪年查询</title>
+<link rel="stylesheet" href="../css/sidepanel.css">
+</head>
+<body>
+  <header class="sp-head">
+    <div class="sp-title">纪年查询</div>
+  </header>
+
+  <div class="sp-search">
+    <input id="sp-q" type="search" autocomplete="off" spellcheck="false"
+           placeholder="输入 年号 / 公元年">
+    <button id="sp-prev" class="sp-step" type="button" title="上一年（长按连续）" aria-label="上一年">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M11.8284 12.0005L14.6569 14.8289L13.2426 16.2431L9 12.0005L13.2426 7.75781L14.6569 9.17203L11.8284 12.0005Z"></path></svg>
+    </button>
+    <button id="sp-next" class="sp-step" type="button" title="下一年（长按连续）" aria-label="下一年">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12.1717 12.0005L9.34326 9.17203L10.7575 7.75781L15.0001 12.0005L10.7575 16.2431L9.34326 14.8289L12.1717 12.0005Z"></path></svg>
+    </button>
+  </div>
+
+  <div id="sp-sug" class="sp-sug" hidden></div>
+
+  <div id="sp-out" class="sp-out"></div>
+
+  <script src="../js/era-table.js"></script>
+  <script src="../js/eras.js"></script>
+  <script src="../js/era-search.js"></script>
+  <script src="../js/sidepanel.js"></script>
+</body>
+</html>

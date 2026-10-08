@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "年号纪年识别",
+  "version": "1.0.1",
+  "description": "识别网页文本中的年号纪年，可以直接标注对应的公元年。支持侧边栏年号查询。",
+  "default_locale": "zh_CN",
+  "action": {
+    "default_title": "年号纪年识别",
+    "default_popup": "src/html/popup.html"
+  },
+  "background": {
+    "service_worker": "src/js/background.js"
+  },
+  "permissions": [
+    "storage",
+    "scripting",
+    "tabs",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "side_panel": {
+    "default_path": "src/html/sidepanel.html"
+  },
+  "options_page": "src/html/options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.shidianguji.com/*"
+      ],
+      "js": [
+        "src/js/content/canvas-main.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/js/storage.js",
+        "src/js/era-table.js",
+        "src/js/eras.js",
+        "src/js/maintext.js",
+        "src/js/era-search.js",
+        "src/js/content/content-state.js",
+        "src/js/content/content-marker.js",
+        "src/js/content/content-annotation.js",
+        "src/js/content/content-scanner.js",
+        "src/js/content/content-ai.js",
+        "src/js/content/content-correction.js",
+        "src/js/content/content-tooltip.js",
+        "src/js/content/canvas-adapter.js",
+        "src/js/content/content-observer.js",
+        "src/js/content/content-message.js",
+        "src/js/content/content.js"
+      ],
+      "css": [
+        "src/css/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

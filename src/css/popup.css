@@ -1,0 +1,673 @@
+
+
+:root {
+  --pp-fg: #1f2430;
+  --pp-fg-dim: #6b7383;
+  --pp-bg: #ffffff;
+  --pp-bg-soft: #f4f6fa;
+  --pp-border: #e2e6ef;
+  --pp-accent: #e8a400;
+  --pp-accent-fg: #ffffff;
+  --pp-ai: #6b4ee6;
+  --pp-ok: #17915b;
+  --pp-warn: #b26a00;
+  --pp-warn-bg: #fff6e0;
+  --pp-warn-border: #f0d9a8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pp-fg: #e7eaf2;
+    --pp-fg-dim: #9aa3b5;
+    --pp-bg: #1a1d24;
+    --pp-bg-soft: #262a33;
+    --pp-border: #363c48;
+    --pp-accent: #f2b705;
+    --pp-accent-fg: #241f06;
+    --pp-ai: #a08cff;
+    --pp-ok: #55d69a;
+    --pp-warn: #f0c274;
+    --pp-warn-bg: #33280f;
+    --pp-warn-border: #5c4a1c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 100%; 
+  max-width: 360px;
+  background: var(--pp-bg);
+  color: var(--pp-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pp-head {
+  padding: 13px 14px 11px;
+  border-bottom: 1px solid var(--pp-border);
+}
+
+.pp-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pp-icon-btn {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--pp-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--pp-fg-dim);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.pp-icon-btn svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+  fill: currentColor;
+}
+
+.pp-icon-btn:hover {
+  color: var(--pp-fg);
+  background: var(--pp-bg-soft);
+  border-color: var(--pp-fg-dim);
+}
+
+.pp-icon-btn:active {
+  transform: scale(0.96);
+}
+
+.pp-icon-btn:focus-visible {
+  outline: 2px solid var(--pp-accent);
+  outline-offset: 2px;
+}
+
+.pp-head-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.pp-brand-text {
+  min-width: 0;
+}
+
+.pp-brand-text strong {
+  display: block;
+
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.pp-brand-text span {
+  display: block;
+  font-size: 11px;
+  color: var(--pp-fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
+}
+
+.pp-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.pp-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pp-stat:first-child {
+  flex: none;
+  min-width: 70px;
+  padding-right: 12px;
+  border-right: 1px solid var(--pp-border);
+}
+
+.pp-stat-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pp-side-btns {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.pp-clear {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--pp-border);
+  background: transparent;
+  color: var(--pp-fg-dim);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.pp-clear:hover:not(:disabled) {
+  color: var(--pp-fg);
+  background: var(--pp-bg-soft);
+}
+
+#btn-annotate[aria-pressed="true"] {
+  color: var(--pp-accent);
+  border-color: var(--pp-accent);
+  background: rgba(232, 164, 0, 0.14);
+}
+
+.pp-clear:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pp-clear.loading {
+  opacity: 0.6;
+}
+
+.pp-stat-num {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--pp-accent);
+}
+
+.pp-stat-label {
+  font-size: 11px;
+  color: var(--pp-fg-dim);
+  line-height: 1.35;
+}
+
+.pp-stat-badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--pp-bg-soft);
+  color: var(--pp-fg-dim);
+  border: 1px solid var(--pp-border);
+}
+
+.pp-stat-badge.is-regex {
+  background: rgba(232, 164, 0, 0.16);
+  border-color: rgba(232, 164, 0, 0.45);
+  color: var(--pp-accent);
+}
+
+.pp-stat-badge.is-ai {
+  background: rgba(107, 78, 230, 0.16);
+  border-color: rgba(107, 78, 230, 0.45);
+  color: var(--pp-ai);
+}
+
+.pp-alert {
+  margin: 0 14px 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  word-break: break-word;
+  /* 没有消息时也占着两行的高度（留空），点按钮时下面的内容就不会上下跳。
+     两行能盖住绝大多数提示；只有三行以上的长提示才会再长一点。 */
+  min-height: 54px;
+}
+
+.pp-alert-warn {
+  background: var(--pp-warn-bg);
+  border-color: var(--pp-warn-border);
+  color: var(--pp-warn);
+}
+
+.pp-alert-err {
+  min-height: 54px;
+  background: rgba(208, 52, 44, 0.1);
+  border-color: rgba(208, 52, 44, 0.35);
+  color: #d0342c;
+}
+
+.pp-alert-ok {
+  background: rgba(23, 145, 91, 0.1);
+  border-color: rgba(23, 145, 91, 0.32);
+  color: var(--pp-ok);
+}
+
+.pp-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 14px;
+  align-items: start;
+}
+
+.pp-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pp-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--pp-border);
+  background: var(--pp-bg-soft);
+  color: var(--pp-fg);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.1s ease, filter 0.15s ease, opacity 0.15s ease;
+}
+
+.pp-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.pp-btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.pp-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.pp-btn-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pp-btn-sub {
+  font-size: 10.5px;
+  color: var(--pp-fg-dim);
+  line-height: 1.3;
+}
+
+/* AI 按钮未按下时跟「正则识别」一样是灰的 —— 紫色只在 aria-pressed="true" 时上
+   （见下面的 #btn-ai[aria-pressed="true"]）。这里不要再写无条件的紫色规则。 */
+
+.pp-btn-title::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+
+  opacity: 0;
+  vertical-align: middle;
+}
+
+.pp-btn[aria-pressed="true"] .pp-btn-title::before {
+  opacity: 1;
+}
+
+#btn-regex[aria-pressed="true"] {
+  border-color: var(--pp-accent);
+  background: rgba(232, 164, 0, 0.16);
+  box-shadow: inset 0 0 0 1px var(--pp-accent);
+}
+
+#btn-regex[aria-pressed="true"] .pp-btn-title {
+  color: var(--pp-accent);
+}
+
+#btn-ai[aria-pressed="true"] {
+  border-color: var(--pp-ai);
+  background: rgba(107, 78, 230, 0.2);
+  box-shadow: inset 0 0 0 1px var(--pp-ai);
+}
+
+#btn-ai[aria-pressed="true"] .pp-btn-title {
+  color: var(--pp-ai);
+}
+
+.pp-btn-ghost {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 14px;
+  padding: 8px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pp-fg-dim);
+}
+
+.pp-btn-ghost:hover:not(:disabled) {
+  color: var(--pp-fg);
+  background: var(--pp-bg-soft);
+}
+
+.pp-cont-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 8px 14px;
+}
+
+.pp-cont-row .pp-cont {
+  flex: none;
+  width: auto;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.pp-btn-mini {
+  flex: none;
+  margin: 0 0 0 8px;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  border-radius: 7px;
+}
+
+.pp-reset-btn {
+  flex: none;
+  margin: 0;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  border-radius: 7px;
+}
+
+.pp-reset-btn:hover:not(:disabled) {
+  color: var(--pp-fg);
+  background: var(--pp-bg-soft);
+}
+
+.pp-ai-reset-btn {
+  margin-left: 8px;
+}
+
+.pp-cont {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 0 0 8px;
+}
+
+.pp-cont-label {
+  font-size: 11px;
+  color: var(--pp-fg-dim);
+  white-space: nowrap;
+  flex: none;
+}
+
+.pp-cont select {
+  flex: none;
+  width: 65x;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 4px 20px 4px 8px;
+  border: 1px solid var(--pp-border);
+  border-radius: 6px;
+  background-color: var(--pp-bg-soft);
+  background-image: linear-gradient(45deg, transparent 50%, var(--pp-fg-dim) 50%),
+    linear-gradient(135deg, var(--pp-fg-dim) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  color: var(--pp-fg);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.pp-cont select:hover {
+  border-color: var(--pp-ai);
+}
+
+.pp-cont select:focus-visible {
+  border-color: var(--pp-ai);
+  box-shadow: 0 0 0 3px rgba(107, 78, 230, 0.18);
+}
+
+.pp-power {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--pp-border);
+  background: transparent;
+  color: var(--pp-fg-dim);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+#pp-power-text {
+  font-size: 13px;
+}
+
+.pp-power:hover {
+  color: var(--pp-fg);
+  background: var(--pp-bg-soft);
+}
+
+.pp-power[aria-pressed="true"] {
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.14);
+}
+
+.pp-power[aria-pressed="true"]:hover {
+  color: #ff8585;
+  border-color: #ff8585;
+  background: rgba(255, 107, 107, 0.22);
+}
+
+.pp-theme {
+  position: relative;
+  flex: none;
+}
+
+.pp-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid var(--pp-border);
+  background: var(--pp-bg-soft);
+  cursor: pointer;
+}
+
+.pp-theme-btn:hover {
+  border-color: var(--pp-accent);
+}
+
+.pp-swatch {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  background: #ffd047;
+}
+
+.pp-theme-menu {
+  position: absolute;
+  /* 贴触发按钮的**左**缘、往右展开。
+     色卡现在挨着「正则重置」（靠左），再用 right:0 会向左顶出弹窗。 */
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 9px;
+  border: 1px solid var(--pp-border);
+  background: var(--pp-bg, #fff);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+/* 按钮和菜单之间有 4px 空隙，补一块透明「桥」把它连起来 ——
+   否则鼠标从按钮挪到菜单、经过空隙时会被判定为「移出」，菜单提前收起。 */
+.pp-theme-menu::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 4px;
+}
+
+.pp-theme-item {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+
+.pp-theme-item[aria-selected="true"] {
+  outline: 2px solid var(--pp-accent);
+  outline-offset: 1px;
+}
+
+/* 色卡挪到「正则重置」右侧后，跟它隔开一点（.pp-cont-row 本身 gap: 0） */
+.pp-cont-row .pp-theme {
+  margin-left: 8px;
+}
+
+.pp-btn.loading .pp-btn-title::after {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: pp-spin 0.7s linear infinite;
+}
+
+@keyframes pp-spin {
+  to { transform: rotate(360deg); }
+}
+
+.pp-settings {
+  border-top: 1px solid var(--pp-border);
+}
+
+.pp-disclosure {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: transparent;
+  border: 0;
+  color: var(--pp-fg);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pp-disclosure:hover {
+  background: var(--pp-bg-soft);
+}
+
+.pp-caret {
+  color: var(--pp-fg-dim);
+  transition: transform 0.16s ease;
+}
+
+.pp-disclosure[aria-expanded="true"] .pp-caret {
+  transform: rotate(180deg);
+}
+
+.pp-settings-body {
+  padding: 2px 14px 14px;
+}
+
+.pp-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--pp-border);
+  background: var(--pp-bg-soft);
+  font-size: 11px;
+  color: var(--pp-fg-dim);
+}
+
+.pp-foot a {
+  color: var(--pp-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pp-foot a:hover {
+  text-decoration: underline;
+}
+
+.pp-theme-item.pp-theme-none,
+.pp-theme-swatch.pp-theme-none {
+  background-image: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    currentColor calc(50% - 1px),
+    currentColor calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+  box-shadow: inset 0 0 0 1px currentColor;
+}

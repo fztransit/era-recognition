@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>年号纪年识别</title>
+  <link rel="stylesheet" href="../css/settings-form.css">
+  <link rel="stylesheet" href="../css/popup.css">
+</head>
+<body>
+  <header class="pp-head">
+    <div class="pp-brand">
+      <img class="pp-logo" src="../../icons/icon32.png" alt="logo" width="32" height="32">
+      <div class="pp-brand-text">
+        <strong id="pp-brand-name">年号纪年识别</strong>
+      </div>
+      <div class="pp-head-actions">
+        <button type="button" class="pp-icon-btn" id="btn-sidepanel" aria-label="打开侧边栏" title="打开侧边栏">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3ZM8 5H4V19H8V5ZM10 5V19H20V5H10Z"></path>
+          </svg>
+        </button>
+        <button type="button" class="pp-power" id="btn-power" aria-pressed="true">
+          <span id="pp-power-text">启用</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <section class="pp-status">
+    <div class="pp-stat">
+      <span class="pp-stat-num" id="pp-count">–</span>
+      <span class="pp-stat-label">处命中</span>
+    </div>
+    <div class="pp-stat pp-stat-main">
+      <span class="pp-stat-badge" id="pp-mode">未分析</span>
+      <span class="pp-stat-label" id="pp-note">点击识别按钮分析</span>
+    </div>
+    <div class="pp-side-btns">
+      <button class="pp-clear" id="btn-clear">
+        <span>清除</span>
+        <span>高亮</span>
+      </button>
+      <button class="pp-clear" id="btn-annotate" aria-pressed="false">
+        <span>文内</span>
+        <span>标注</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- 一直占着位置（没消息时留空），避免点按钮时下面的内容上下跳一下 -->
+  <div class="pp-alert" id="pp-alert"></div>
+
+  <section class="pp-actions">
+    <div class="pp-col">
+      <button class="pp-btn" id="btn-regex">
+        <span class="pp-btn-title">正则识别</span>
+        <span class="pp-btn-sub">本地匹配，秒出结果</span>
+      </button>
+    </div>
+    <div class="pp-col">
+      <button class="pp-btn pp-btn-ai" id="btn-ai" aria-pressed="false">
+        <span class="pp-btn-title">AI 识别</span>
+        <span class="pp-btn-sub">语义理解，需先配 API</span>
+      </button>
+    </div>
+  </section>
+
+  <div class="pp-cont-row">
+    <button type="button" class="pp-btn pp-btn-ghost pp-btn-mini pp-reset-btn" id="btn-regex-reset" title="清除本页已保存的更正，再用正则重新识别。">
+      <span>正则重置</span>
+    </button>
+    <!-- 标注颜色样式：选项就是色卡本身，不带文字。
+         原生 <select> 的 <option> 没法可靠地渲染色块，所以自建一个。 -->
+    <div class="pp-theme" id="pp-theme">
+      <button type="button" class="pp-theme-btn" id="btn-theme" aria-haspopup="listbox"
+        aria-expanded="false" title="标注颜色样式">
+        <span class="pp-swatch" id="pp-theme-swatch"></span>
+      </button>
+      <div class="pp-theme-menu" id="pp-theme-menu" role="listbox" style="display:none"></div>
+    </div>
+    <label class="pp-cont">
+      <span class="pp-cont-label">连续使用</span>
+      <select id="sel-continuous">
+        <option value="once">单次</option>
+        <option value="20">20 次</option>
+        <option value="100">100 次</option>
+        <option value="300">300 次</option>
+        <option value="999">999 次</option>
+      </select>
+    </label>
+    <button class="pp-btn pp-btn-ghost pp-btn-mini pp-ai-reset-btn" id="btn-ai-reset" title="清除本地已保存的AI识别结果，再重新使用AI识别。">AI重置</button>
+  </div>
+
+  <section class="pp-settings">
+    <button class="pp-disclosure" id="btn-toggle-sites" aria-expanded="false">
+      <span>站点设置</span>
+      <span class="pp-caret">▾</span>
+    </button>
+    <div class="pp-settings-body" id="pp-sites-body" hidden>
+      <div id="pp-sites-mount"></div>
+    </div>
+  </section>
+
+  <section class="pp-settings">
+    <button class="pp-disclosure" id="btn-toggle-settings" aria-expanded="false">
+      <span>AI模型配置</span>
+      <span class="pp-caret">▾</span>
+    </button>
+    <div class="pp-settings-body" id="pp-settings-body" hidden>
+      <div id="pp-settings-mount"></div>
+    </div>
+  </section>
+
+  <section class="pp-settings">
+    <button class="pp-disclosure" id="btn-toggle-custom" aria-expanded="false">
+      <span>自定义设置</span>
+      <span class="pp-caret">▾</span>
+    </button>
+    <div class="pp-settings-body" id="pp-custom-body" hidden>
+      <div id="pp-custom-mount"></div>
+    </div>
+  </section>
+
+  <section class="pp-settings">
+    <button class="pp-disclosure" id="btn-toggle-data" aria-expanded="false">
+      <span>导出数据</span>
+      <span class="pp-caret">▾</span>
+    </button>
+    <div class="pp-settings-body" id="pp-data-body" hidden>
+      <div id="pp-data-mount"></div>
+    </div>
+  </section>
+
+  <footer class="pp-foot">
+    <span id="pp-era-total">–</span>
+    <a href="#" id="btn-options">打开详细设置</a>
+  </footer>
+
+  <script src="../js/era-table.js"></script>
+  <script src="../js/eras.js"></script>
+  <script src="../js/ai-core.js"></script>
+  <script src="../js/models.js"></script>
+  <script src="../js/settings-form.js"></script>
+  <script src="../js/popup.js"></script>
+</body>
+</html>

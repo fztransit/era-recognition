@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>年号纪年识别 · 设置</title>
+  <link rel="stylesheet" href="../css/settings-form.css">
+  <link rel="stylesheet" href="../css/options.css">
+</head>
+<body>
+  <div class="op-wrap">
+    <header class="op-head">
+      <span class="op-logo">年</span>
+      <div>
+        <h1>年号纪年识别 · 设置</h1>
+      </div>
+    </header>
+
+    <main class="op-grid">
+      <section class="op-card op-settings-card">
+        <div id="op-settings-mount"></div>
+      </section>
+
+      <aside class="op-side">
+        <section class="op-card op-card-plain">
+          <h2>功能说明</h2>
+          <ul class="op-list">
+            <li><strong>功能设置：</strong>点击浏览器右上角的扩展图标，显示弹框，可在页面上进行设置。</li>
+            <li><strong>正则识别：</strong>安装后默认启用，识别迅速，打开网页自动识别并在页面上高亮纪年。如果识别错误，可以点击纪年手动更改，</li>
+            <li><strong>AI识别：</strong>AI识别支持语义理解，识别结果更准确，但是速度较慢且有使用成本，需自己填写API Key才能使用。（以deepseek-flash闲时价格为例，平均每个页面识别成本约为0.05分。）AI识别结果会被记录到缓存中，下次打开相同页面点击“AI识别”只读取缓存，不消耗token，除非点击“AI重置”才重新识别。</li>
+            <li><strong>文内标注：</strong>安装扩展后默认未开启，需要手动点击开启。开启后会在原文中插入公元纪年。部分网页自带年号注释，本程序可以跳过，不会重复标注。</li>
+            <li><strong>色卡选择：</strong>自定义纪年高亮颜色，透明色可以只标注不高亮。</li>
+            <li><strong>卡片标注：</strong>点击高亮纪年弹出卡片，卡片上支持直接点击公元年切换识别的年号。也可以点击“更正”按钮手动填写年号进行切换。更改结果会记录到缓存中，下次打开相同页面无需手动修改。</li>
+            <li><strong>侧边栏：</strong>点击“侧边栏”按钮后打开，支持年号查询，包括古代纪年查询公历年，公历年查询古代纪年。</li>
+            <li><strong>年号数据：</strong>数据来源参考：方诗铭《中国历史纪年表》、李崇智《中国历代年号考》、《夏商周断代工程报告（简本）》等。BC841年前数据一律显示“约”。</li>
+            <li><strong>数据安全：</strong>使用“正则识别”全部在本地完成，无网络交互。使用“AI识别”数据会提交给自己指定的模型厂商。本项目全部开源，不搜集任何用户数据。</li>
+            <li><strong>功能局限：</strong>目前仍有部分网站不支持识别，需要单独处理，等待后续更新。</li>
+            <li><strong>手机支持：</strong>部分手机浏览器支持安装插件即可使用，如Edge浏览器可在手机端应用商店下载安装。</li>
+            <li><strong>更新方式：</strong>可在应用商店下载或者浏览器中直接“加载未打包的扩展程序”，直接加载会自动保存缓存记录。如果先移除再加载，会导致缓存丢失，需要先手动导出备份。</li>
+            <li><strong>可拓展性：</strong>项目开源，可修改源码增加功能，或在年号表中添加周边王朝年号。开源地址：<a href="https://github.com/fztransit/era-recognition" target="_blank" rel="noopener">https://github.com/fztransit/era-recognition</a></li>
+          </ul>
+          <p class="op-muted op-tip">
+            作　　者：方中<br>
+            联系方式：fangzhongts@163.com
+          </p>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script src="../js/models.js"></script>
+  <!-- ai-log-panel.js 仅开发测试用：删掉这一行 + 那个文件，只是看不到「AI 调用记录」区块。 -->
+  <script src="../js/ai-log-panel.js"></script>
+  <script src="../js/settings-form.js"></script>
+  <script src="../js/options.js"></script>
+</body>
+</html>

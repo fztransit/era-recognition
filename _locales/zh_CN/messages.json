@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "年号纪年识别"
+  },
+  "extensionDescription": {
+    "message": "识别网页文本中的年号纪年，可以直接标注对应的公元年。支持侧边栏年号查询。"
+  }
+}

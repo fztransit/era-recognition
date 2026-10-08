@@ -1,0 +1,459 @@
+
+
+.esf-root {
+  --esf-fg: #1f2430;
+  --esf-fg-dim: #6b7383;
+  --esf-bg: #ffffff;
+  --esf-bg-soft: #f4f6fa;
+  --esf-border: #dfe3ec;
+  --esf-accent: #e8a400;
+  --esf-accent-fg: #ffffff;
+  --esf-ok: #17915b;
+  --esf-err: #d0342c;
+  color: var(--esf-fg);
+  font-size: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .esf-root {
+    --esf-fg: #e7eaf2;
+    --esf-fg-dim: #9aa3b5;
+    --esf-bg: #1d2027;
+    --esf-bg-soft: #262a33;
+    --esf-border: #363c48;
+    --esf-accent: #f2b705;
+    --esf-accent-fg: #241f06;
+    --esf-ok: #55d69a;
+    --esf-err: #ff7b72;
+  }
+}
+
+.esf-section-title:first-child {
+  margin-top: 0;
+}
+
+.esf-root:not(.esf-compact) {
+  display: grid;
+  gap: 14px;
+}
+
+.esf-root:not(.esf-compact) .esf-sec {
+  padding: 18px 20px;
+  border: 1px solid var(--esf-border);
+  border-radius: 12px;
+  background: var(--esf-bg);
+}
+
+.esf-root:not(.esf-compact) .esf-sec > h1 {
+  margin: 0 0 12px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--esf-border);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--esf-fg);
+}
+
+.esf-root:not(.esf-compact) .esf-sec > h1::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 1em;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: var(--esf-accent);
+  vertical-align: -0.12em;
+}
+
+/* 每行一个 grid：label 固定宽第一列、控件第二列、提示在第二列下一行
+   —— 于是所有行的 label 竖向对齐。 */
+.esf-field {
+  display: grid;
+  grid-template-columns: var(--esf-label-w, 88px) minmax(0, 1fr);
+  /* 单行控件（下拉 / 输入框 / 单选组）与 label 垂直居中对齐 ——
+     顶对齐会受字体和缩放影响，看起来 label 偏下。 */
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 4px;
+  margin: 8px 0;
+}
+.esf-split-main .esf-field {
+  margin: 0;
+}
+.esf-label {
+  display: block;
+  font-size: 13px;
+  /* 用整数行高：半像素行高在 125% 之类的缩放下取整会偏，label 与控件就对不齐了 */
+  line-height: 18px;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: var(--esf-fg);
+}
+
+/* grid 里的 label：只占第一列 */
+.esf-field > .esf-label {
+  grid-column: 1;
+  margin-bottom: 0;
+}
+
+/* 多行文本框那两行：label 跟第一行文字对齐，不居中 */
+.esf-field[data-role="allowed-field"],
+.esf-field[data-role="blocked-field"] {
+  align-items: start;
+}
+
+.esf-field[data-role="allowed-field"] > .esf-label,
+.esf-field[data-role="blocked-field"] > .esf-label {
+  padding-top: 8px;
+}
+
+.esf-field > .esf-hint {
+  grid-column: 2;
+  margin-top: 0;
+}
+
+/* 标签与单选组同处一行（老结构，仍兼容） */
+.esf-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.esf-inline .esf-label {
+  margin-bottom: 0;
+}
+
+.esf-radios {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.esf-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  /* 整数行高（见 .esf-label 的说明）：圆圈才能在任何缩放下都跟文字居中 */
+  line-height: 18px;
+  color: var(--esf-fg);
+  cursor: pointer;
+  user-select: none;
+}
+
+.esf-radio input[type="radio"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--esf-accent);
+  cursor: pointer;
+  /* 圆圈按盒子居中时会比汉字墨迹略高（字体 ascent/descent 不对称），
+     往下挪 0.5px 做视觉对齐 —— 用 relative 不影响布局。
+     实测 100% / 125% / 150% / 200% 缩放下都落在 ±0.5px 内。 */
+  position: relative;
+  top: 0.5px;
+}
+
+.esf-radio input[type="radio"]:focus {
+  box-shadow: none;
+}
+
+/* 「导出数据」里的三项复选框（写法对照上面的 .esf-radio） */
+.esf-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 2px 0 0;
+}
+
+.esf-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12.5px;
+  /* 整数行高，方块才能跟第一行文字稳定居中 */
+  line-height: 18px;
+  color: var(--esf-fg);
+  cursor: pointer;
+  user-select: none;
+}
+
+.esf-check strong {
+  font-weight: 600;
+}
+
+.esf-check input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 1px 0 0;
+  flex: none;
+  accent-color: var(--esf-accent);
+  cursor: pointer;
+  /* 说明文字可能折行，方块跟着第一行走 */
+  position: relative;
+  top: 2px;
+}
+
+.esf-check input[type="checkbox"]:focus {
+  box-shadow: none;
+}
+
+.esf-field input[type="text"],
+.esf-field input[type="password"],
+.esf-field input[type="number"],
+.esf-field textarea,
+.esf-field select {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--esf-border);
+  border-radius: 7px;
+  background: var(--esf-bg);
+  color: var(--esf-fg);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.esf-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 11px) 50%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.esf-field textarea {
+  resize: vertical;
+  min-height: 62px;
+  line-height: 1.6;
+}
+
+.esf-field input:focus,
+.esf-field textarea:focus,
+.esf-field select:focus {
+  border-color: var(--esf-accent);
+  box-shadow: 0 0 0 3px rgba(242, 183, 5, 0.18);
+}
+
+.esf-hint {
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--esf-fg-dim);
+}
+
+.esf-hint strong {
+  color: var(--esf-fg);
+  font-weight: 600;
+}
+
+/* 「导出数据」区块里那行「当前：…」统计 */
+.esf-data-stats {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--esf-fg-dim);
+}
+
+
+.esf-check em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--esf-fg-dim);
+}
+
+.esf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.esf-btn {
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--esf-border);
+  background: var(--esf-bg-soft);
+  color: var(--esf-fg);
+  font-size: 12.5px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.esf-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.esf-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.esf-btn-primary {
+  background: var(--esf-accent);
+  border-color: var(--esf-accent);
+  color: var(--esf-accent-fg);
+}
+
+.esf-btn-ghost {
+  background: transparent;
+}
+
+/* .esf-actions 行右侧的即时提示：已恢复 / 已清空 / 已取消 */
+.esf-action-note {
+  margin-left: auto;
+  align-self: center;
+  font-size: 12px;
+  color: var(--esf-ok);
+  white-space: nowrap;
+}
+
+.esf-btn-sm {
+  flex: none;
+  padding: 4px 10px;
+  font-size: 11.5px;
+}
+
+/* ---- 「自定义设置」：左 2 : 右 1 两栏，右栏是选项说明（点 esf-label 显示）---- */
+/* 用 grid 的 2fr:1fr 而不是 flex 的 2:1 —— flex-basis 分的是「内容盒」，
+   右栏的 padding / border 会让视觉宽度变成 1.7:1；grid 的轨道直接就是外框宽度。
+   不写 align-items（默认 stretch），右栏高度就等于左栏那一行的高度。 */
+.esf-split {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 16px;
+}
+.esf-split-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.esf-split-main,
+.esf-split-side,
+.esf-tipbox {
+  min-width: 0;
+}
+
+/* 右栏：提示框在上、「恢复默认」按钮在下，竖排。
+   提示框 flex:1 吃掉按钮之外的全部高度（min-height:0 + overflow-y:auto 兜住长内容），
+   所以「提示框 + 按钮」正好占满右栏（= 左栏）那一块，不多不少。 */
+.esf-split-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* 提示框：固定高度（119 = 三行说明 + 上下 padding），
+   和下面的按钮加起来正好占满右栏那一块（119 + 8 + 25 = 152），切状态不跳。
+   内容超过就内部滚动。 */
+.esf-tipbox {
+  flex: none;
+  height: 119px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 13px;
+  border: 1px solid var(--esf-border);
+  border-radius: 10px;
+  background: var(--esf-bg-soft);
+}
+
+/* 窄屏就上下摞起来，别把两栏挤成一条 */
+@media (max-width: 760px) {
+  .esf-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 提示框一直都在（没点过任何选项 / label 时显示一句占位文字，见 .esf-tipbox-empty）。 */
+
+/* 没点过时的占位提示 */
+.esf-tipbox-empty {
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: var(--esf-fg-dim);
+}
+
+/* 按钮区：常驻在提示框下面，靠右 */
+.esf-tipbox-actions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.esf-tipbox-title {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--esf-border);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--esf-fg);
+}
+
+/* 说明：每个选项一行，形如「<strong>悬浮：</strong>鼠标悬浮在高亮位置自动弹框」 */
+.esf-tipbox-desc {
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: var(--esf-fg-dim);
+}
+
+.esf-tipbox-desc strong {
+  color: var(--esf-fg);
+  font-weight: 600;
+}
+
+/* 自定义设置里的 label 是可以点的：给个手型，悬停 / 被选中时用主题色 */
+.esf-split-main .esf-label {
+  cursor: pointer;
+}
+
+.esf-split-main .esf-label:hover,
+.esf-field-tip-on > .esf-label {
+  color: var(--esf-accent);
+}
+
+/* ---- 弹窗（.esf-compact）里的「自定义设置」----
+   弹窗只有 350px 宽，放不下设置页那种「左设置 / 右提示」的两栏，
+   改成上下两行：上一行是各项设置（.esf-split-main），下一行是提示区（.esf-split-side）。 */
+.esf-compact .esf-split {
+  grid-template-columns: 1fr;
+}
+
+/* 弹窗里的区块标题由弹窗自己的折叠条负责（「自定义设置」「导出数据」…），这里不再重复显示。 */
+.esf-compact .esf-sec > h1 {
+  display: none;
+}
+
+/* 下面这一行内部左右排：提示框在左，按钮在右。 */
+.esf-compact .esf-split-side {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+/* 提示框吃掉按钮之外的全部宽度；高度贴内容走（不再是设置页那个固定 119px）。 */
+.esf-compact .esf-tipbox {
+  flex: 1 1 auto;
+  height: auto;
+}
+
+/* 按钮常驻右侧、垂直居中。 */
+.esf-compact .esf-tipbox-actions {
+  flex: none;
+  align-items: center;
+}
+
+/* 「AI 调用记录」的样式不在这里 —— 跟着 ai-log-panel.js 一起注入（仅开发测试用，见那个文件开头）。 */
