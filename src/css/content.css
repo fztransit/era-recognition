@@ -322,3 +322,11 @@ html[data-era-hl] .era-hl-canvas-anno {
   pointer-events: none;
   z-index: 11;
 }
+/* 文内标注标签跟着色卡走：底色用同色系的深色、文字用该色卡的亮色。
+   以前只有琥珀一种，换了色卡标签颜色也不变（正文高亮却变了），看着对不上。 */
+html[data-era-hl][data-era-theme="green"] .era-hl-canvas-anno { background: rgba(18, 30, 24, 0.88); color: #7ee0a6; }
+html[data-era-hl][data-era-theme="blue"] .era-hl-canvas-anno { background: rgba(16, 25, 36, 0.88); color: #7cc0ff; }
+html[data-era-hl][data-era-theme="pink"] .era-hl-canvas-anno { background: rgba(34, 19, 27, 0.88); color: #ff9ac6; }
+html[data-era-hl][data-era-theme="gray"] .era-hl-canvas-anno { background: rgba(24, 25, 28, 0.88); color: #c8cfda; }
+/* 透明色卡：高亮不画，但标注仍然显示 —— 用中性灰，别硬塞一个琥珀色。 */
+html[data-era-hl][data-era-theme="none"] .era-hl-canvas-anno { background: rgba(24, 25, 28, 0.88); color: #c8cfda; }

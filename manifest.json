@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "年号纪年识别",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "识别网页文本中的年号纪年，可以直接标注对应的公元年。支持侧边栏年号查询。",
   "default_locale": "zh_CN",
   "action": {

@@ -229,7 +229,7 @@
         });
         return load();
     }
-    // 「自定义设置」区块的恢复默认（按钮在右栏提示框里）：把那一栏 5 项写回默认值。
+    // 「自定义设置」区块的恢复默认（按钮在右栏提示框里）：把那一栏 6 项写回默认值。
     // regexMode ↔ autoRegex、annoCopy ↔ copyAnno，写存储用的是后者。
     async function resetCustomSettings() {
         await syncSet({
