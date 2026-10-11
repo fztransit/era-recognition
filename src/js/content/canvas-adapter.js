@@ -17,14 +17,14 @@
     const BARE_GZ = /([甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])年/g;
     const BARE_YEAR = new RegExp('(' + D.CN_YEAR_PART + ')年', 'g');
     const BEFORE_PUNCT = /[\s。．，、；;,：:？！?!…—～~「」『』“”‘’"'（）()〈〉《》【】\[\]{}·]/;
-    const BEFORE_WORDS = new Set(['诏', '詔', '其']);
+    const BEFORE_WORDS = new Set(['诏', '詔', '其', '起', '讫', '訖']);
 
     function isCanvasSite() {
         return location.hostname.toLowerCase() === 'www.shidianguji.com';
     }
 
     function siteAllowed() {
-        if (!isCanvasSite() || !R.settings.enabled || !R.settings.autoRegex)
+        if (!isCanvasSite() || !R.settings.enabled)
             return false;
         // 站点规则照常生效：识别模式（限制 / 全局 / 自定义）+ 禁用网站 / 自定义网站。
         // 这里以前在「限制」模式下直接 return true，等于把识典从 blockedSites 里豁免了 ——
@@ -106,9 +106,17 @@
     }
 
     function isBoundary(text, index) {
-        if (index <= 0) return true;
-        const ch = String(text || '').charAt(index - 1);
-        return BEFORE_PUNCT.test(ch) || BEFORE_WORDS.has(ch);
+        if (index <= 0)
+            return true;                                    // 画布文字开头 = 段首
+        const s = String(text || '');
+        const ch = s.charAt(index - 1);
+        if (BEFORE_PUNCT.test(ch))
+            return true;                                    // 前面就是标点
+        if (!BEFORE_WORDS.has(ch))
+            return false;                                   // 既不是标点也不是边界字
+        if (index - 1 <= 0)
+            return true;                                    // 边界字本身就在开头
+        return BEFORE_PUNCT.test(s.charAt(index - 2));      // ★ 边界字前面也必须是标点
     }
 
     function makeGanzhiContext(list, gz, matched) {

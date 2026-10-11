@@ -437,6 +437,65 @@
         sugItems = [];
         sugOn = -1;
     }
+    // 把「年号候选」画进建议框：先列 search() 的结果，再补上「更长的同前缀年号」。
+    // 「建武」→「建武中元」：search() 按「包含」匹配，一般已经把它们带上了，
+    // 这里补一遍主要是兜底 —— 免得同前缀的短年号条数把 12 条上限占满、更长的那个被截掉。
+    function renderEraPicks(rows, frag) {
+        sugEl.textContent = "";
+        const picks = rows.map(function (r) {
+            return { name: r.name, dynasty: r.dynasty, emperor: r.emperor };
+        });
+        const haveName = Object.create(null);
+        for (const it of picks)
+            haveName[EraSearch.fold(it.name)] = 1;
+        for (const nm of EraSearch.extensions(frag, 12)) {
+            const key = EraSearch.fold(nm);
+            if (haveName[key])
+                continue;
+            haveName[key] = 1;
+            const row = D.lookupEra(nm)[0];
+            picks.push({ name: nm, dynasty: row ? row.dynasty : '', emperor: row ? row.emperor : '' });
+        }
+        sugItems = picks.map(function (it) { return it.name; });
+        sugOn = -1;
+        picks.forEach(function (it, i) {
+            const item = el("div", "sp-sug-item");
+            item.appendChild(el("b", null, it.name));
+            // 前面 <b> 已经写了年号名，帝号跟它同名时这里只留朝代
+            const meta = D.whoText(it.dynasty, it.emperor, '', it.name);
+            if (meta)
+                item.appendChild(el("span", "sp-sug-meta", meta));
+            item.addEventListener("mousedown", function (e) {
+                e.preventDefault();
+                applySug(picks[i].name);
+            });
+            item.setAttribute("data-i", String(i));
+            sugEl.appendChild(item);
+        });
+        try {
+            const b = qEl.getBoundingClientRect();
+            const h = document.body.getBoundingClientRect();
+            sugEl.style.top = (b.bottom - h.top + 4) + "px";
+        }
+        catch (e) { }
+        sugEl.hidden = false;
+    }
+    // 输入的年号片段「正好落在输入末尾」时，返回它还作为前缀的更长年号（「建武」→「建武中元」）。
+    // 三个前提，缺一不可：
+    //   1) 片段落在输入末尾 —— 后面还跟着纪年 / 干支（「建武三年」）不算：用户已经把年号定下来了，
+    //      而且 applySug 是按「替换末尾片段」拼的，片段不在末尾会把纪年拼坏。
+    //   2) **输入本身就是一条年号**（`lookupEra` 命中）—— 「建武」「太平」是完整年号，该提示
+    //      「建武中元 / 太平興國」；「武」「太」「天」这种半截输入不是，得留给原来的帝号建议，
+    //      否则单字输入会把帝号弹框整支抢走（只剩年号）。
+    //   3) 确实存在更长的同前缀年号。
+    function extensionPicks(frag) {
+        const cur = String(qEl.value || '');
+        if (!frag || cur.slice(-frag.length) !== frag)
+            return [];
+        if (!D.lookupEra(frag).length)
+            return [];
+        return EraSearch.extensions(frag, 12);
+    }
     function showSug(frag) {
         if (!sugEl)
             return;
@@ -475,6 +534,14 @@
         const rows = EraSearch.search(frag, 12);
         const rawText = EraSearch.fold(EraSearch.stripYearTail(qEl.value));
         const specific = !!pickEmperor(qEl.value);
+        // 「建武」这类：输入本身是个**完整年号**，但它还是别的更长年号的开头（建武中元）。
+        // 这时给「年号候选」框让用户挑，排在帝号建议之前 —— 否则「太平」会先命中
+        // 「太平天國」的帝号（洪秀全），弹出一串帝号反而没有年号可选。
+        // 注意半截输入（「武」「太」）不会走到这里：extensionPicks 要求 lookupEra(frag) 命中。
+        if (extensionPicks(frag).length) {
+            renderEraPicks(rows, frag);
+            return;
+        }
         if (emps.length && !specific) {
             sugEl.textContent = "";
             sugItems = [];
@@ -559,30 +626,7 @@
             sugEl.hidden = false;
             return;
         }
-        sugEl.textContent = "";
-        sugItems = rows.map(function (r) { return r.name; });
-        sugOn = -1;
-        rows.forEach(function (r, i) {
-            const item = el("div", "sp-sug-item");
-            item.appendChild(el("b", null, r.name));
-            // 前面 <b> 已经写了年号名，帝号跟它同名时这里只留朝代
-            const meta = D.whoText(r.dynasty, r.emperor, '', r.name);
-            if (meta)
-                item.appendChild(el("span", "sp-sug-meta", meta));
-            item.addEventListener("mousedown", function (e) {
-                e.preventDefault();
-                applySug(rows[i].name);
-            });
-            item.setAttribute("data-i", String(i));
-            sugEl.appendChild(item);
-        });
-        try {
-            const b = qEl.getBoundingClientRect();
-            const h = document.body.getBoundingClientRect();
-            sugEl.style.top = (b.bottom - h.top + 4) + "px";
-        }
-        catch (e) { }
-        sugEl.hidden = false;
+        renderEraPicks(rows, frag);
     }
     function applySug(name, clearFirst) {
         const cur = qEl.value || "";
@@ -627,11 +671,14 @@
         const res = search(qEl.value);
         const isWho = !!(res && res.kind === "emperor" && res.list && res.list.length > 1);
         const onlyDyn = !hasResults(qEl.value) && EraSearch.dynasties(EraSearch.stripYearTail(qEl.value), 12).length > 1;
-        if (!isWho && !onlyDyn && hasResults(qEl.value)) {
+        const frag = EraSearch.fragmentOf(qEl.value);
+        // 「建武」这类：输入本身就是一个年号，但它还是别的更长年号的开头（建武中元）。
+        // 这时即使已经有结果，也要弹建议框，让用户能选到更长的那个。
+        const exts = extensionPicks(frag);
+        if (!isWho && !onlyDyn && !exts.length && hasResults(qEl.value)) {
             hideSug();
             return;
         }
-        const frag = EraSearch.fragmentOf(qEl.value);
         if (frag)
             showSug(frag);
         else

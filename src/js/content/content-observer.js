@@ -62,7 +62,7 @@
             const aiMode = R.state.mode === 'ai' && C.aiWindowActive();
             if (R.state.mode === 'ai' && !aiMode)
                 return;
-            if (aiMode ? R.aiRescanLeft <= 0 : !R.settings.autoRegex || R.scanBudget <= 0)
+            if (aiMode ? R.aiRescanLeft <= 0 : R.scanBudget <= 0)
                 return;
             clearTimeout(R.scanTimer);
             R.scanTimer = setTimeout(function () {

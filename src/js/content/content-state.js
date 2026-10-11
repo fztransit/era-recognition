@@ -16,7 +16,12 @@
     const ANNO_CLASS = 'era-hl-anno';
     // Canvas 阅读器的覆盖标记：与普通 DOM 年号标记分开，避免 clearMarks() 把覆盖层还原成正文文本。
     const CANVAS_MARK = 'era-hl-canvas-mark';
-    const MARK_THEMES = ['amber', 'green', 'blue', 'pink', 'gray', 'none'];
+    // 浅色变体（amber/green/blue/pink/gray）+ 深色网页变体（*-dark）。白名单漏一个，
+    // applyMarkTheme() 就会把用户选的色卡当成非法值退回 amber —— 加色卡时这里必须同步加。
+    const MARK_THEMES = [
+        'amber', 'green', 'blue', 'pink', 'gray', 'none',
+        'amber-dark', 'green-dark', 'blue-dark', 'pink-dark', 'gray-dark'
+    ];
     // 「限制」模式下默认禁用的网站。识典古籍**不在这里** —— 它的正文画在 canvas 上，
     // DOM 扫描器本来就标不到（见 content-scanner.js 的 runRegex），
     // 识别由 canvas-adapter 负责；用户想关掉它，自己加进「禁用网站」即可。
@@ -24,7 +29,6 @@
     // 仅这些网站受「文内标注限制」控制；网站列表固定写在 JS 中，不在设置页面展示。
     const INLINE_ANNOTATION_LIMIT_SITES = ['www.shidianguji.com'];
     const DEFAULTS = Object.freeze({
-        autoRegex: true,
         // 「AI 缓存优先」：true = 打开页面时先看这个页面有没有 AI 缓存，
         // 有就用 AI 缓存结果、不跑正则；没有才退回正则。false（默认）= 照常跑正则。
         regexReplace: false,
@@ -144,7 +148,7 @@
     }
     function siteModeOf(source) {
         const mode = String((source && source.siteMode) || 'restricted');
-        return mode === 'global' || mode === 'custom' ? mode : 'restricted';
+        return mode === 'global' || mode === 'custom' || mode === 'disabled' ? mode : 'restricted';
     }
     function normalizeSiteRule(value) {
         let rule = String(value == null ? '' : value).trim().toLowerCase();
@@ -193,6 +197,9 @@
             return true;
         if (mode === 'custom')
             return matchesSiteList(href, cfg.allowedSites);
+        // 「全局禁用」：所有网页都不自动识别，只能在弹窗里手动点识别按钮。
+        if (mode === 'disabled')
+            return false;
         return !matchesSiteList(href, cfg.blockedSites);
     }
     function inlineAnnotationAllowed(href, source) {
@@ -317,7 +324,6 @@
             autoAllowed: !!state.autoAllowed,
             allowedSites: Array.isArray(s.allowedSites) ? s.allowedSites.slice() : [],
             standalone: !!s.standalone,
-            autoRegex: !!s.autoRegex,
             annotate: !!s.annotate,
             annoCount: document.querySelectorAll('.' + ANNO_CLASS).length,
             apiKeySet: !!s.apiKey,

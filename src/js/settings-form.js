@@ -2,7 +2,6 @@
     'use strict';
     const M = global.EraModels;
     const DEFAULTS = {
-        autoRegex: true,
         // 「AI 缓存优先」：true = 页面有 AI 缓存就用缓存结果、不跑正则；false（默认）= 照常跑正则。
         regexReplace: false,
         standalone: false,
@@ -27,13 +26,12 @@
         apiBase: 'text',
         apiKey: 'text',
         model: 'text',
-        autoRegex: 'check',
         standalone: 'check',
         enabled: 'check',
         tooltipTrigger: 'select'
     };
     const PROFILE_KEYS = ['apiBase', 'apiKey', 'model'];
-    const SITE_MODES = ['restricted', 'custom', 'global'];
+    const SITE_MODES = ['restricted', 'custom', 'global', 'disabled'];
     const TOOLTIP_TRIGGERS = ['hover', 'click', 'longpress'];
     // 「自定义设置」右栏（提示框）的文案：key = 控件上的 data-k，值 = { 选项值: 说明 }。
     // 标题和每个选项的名字都取界面上的文字（esf-label / esf-radio），这里只写说明。
@@ -43,13 +41,9 @@
             click: '鼠标点击高亮位置后弹出',
             longpress: '鼠标长按高亮位置后弹出'
         },
-        regexMode: {
-            auto: '打开页面自动使用正则识别',
-            click: '在扩展弹窗里点「正则识别」识别'
-        },
         regexReplace: {
-            replace: '计算使用正则识别，当页面有AI缓存时，优先用缓存结果',
-            keep: '照常使用正则识别'
+            replace: '使用正则识别时，如果页面有AI缓存，优先用缓存结果',
+            keep: '只使用正则识别'
         },
         annoCopy: {
             keep: '复制页面文字时包含标注',
@@ -75,7 +69,7 @@
     // 站点三项（siteMode / allowedSites / blockedSites）也不在这里：它们由 bundle 的 `sites` 段负责，
     // 免得同一份数据在两处各写一遍、导入时互相打架。
     const SETTINGS_KEYS = [
-        'autoRegex', 'regexReplace', 'standalone', 'annotate', 'copyAnno', 'preRepublic',
+        'regexReplace', 'standalone', 'annotate', 'copyAnno', 'preRepublic',
         'siteAnnotationMode', 'maxChars', 'markTheme', 'enabled', 'tooltipTrigger', 'aiContinuous',
         // 「导出数据」那几个勾选框的状态（用户要求：它也属于「所有设置」）
         'dataPicks'
@@ -83,7 +77,6 @@
     // 上面这些键「没存过」时用什么值（和 content-state.js 的 DEFAULTS 对齐）。
     // 导出时按「有效值」写：存储里没有的键也写进去，导出的文件才是完整的一份设置快照。
     const SETTINGS_FALLBACK = {
-        autoRegex: true,
         regexReplace: false,
         standalone: false,
         annotate: false,
@@ -105,7 +98,7 @@
             // 写回去就把 apiProfiles、customModels 和扁平 apiKey 一起清空 ——
             // 表现是「在设置页随便改个开关，AI 的 API Key 就没了」。新增模型键时必须同步加到这里。
             chrome.storage.sync.get({
-                autoRegex: true, regexReplace: false, standalone: false, annotate: false, maxChars: 12000,
+                regexReplace: false, standalone: false, annotate: false, maxChars: 12000,
                 enabled: DEFAULTS.enabled,
                 siteMode: DEFAULTS.siteMode,
                 allowedSites: DEFAULTS.allowedSites,
@@ -130,7 +123,6 @@
         const norm = M.normalize(src);
         const flat = M.flatten(norm.profiles, norm.activeId);
         return {
-            autoRegex: src.autoRegex !== false,
             regexReplace: src.regexReplace === true,
             standalone: !!src.standalone,
             annotate: !!src.annotate,
@@ -229,12 +221,11 @@
         });
         return load();
     }
-    // 「自定义设置」区块的恢复默认（按钮在右栏提示框里）：把那一栏 6 项写回默认值。
-    // regexMode ↔ autoRegex、annoCopy ↔ copyAnno，写存储用的是后者。
+    // 「自定义设置」区块的恢复默认（按钮在右栏提示框里）：把那一栏 5 项写回默认值。
+    // annoCopy ↔ copyAnno，写存储用的是后者。
     async function resetCustomSettings() {
         await syncSet({
             tooltipTrigger: DEFAULTS.tooltipTrigger,
-            autoRegex: DEFAULTS.autoRegex,
             regexReplace: DEFAULTS.regexReplace,
             copyAnno: DEFAULTS.copyAnno,
             siteAnnotationMode: DEFAULTS.siteAnnotationMode,
@@ -554,7 +545,8 @@
             '  <select data-k="siteMode">',
             '    <option value="restricted">限制 —— 除禁用网站外都自动识别</option>',
             '    <option value="custom">自定义 —— 只识别名单内网站</option>',
-            '    <option value="global">全局 —— 所有网站都自动识别</option>',
+            '    <option value="global">全局自动 —— 所有网站都自动识别</option>',
+            '    <option value="disabled">全局手动 —— 所有网站都需手动识别</option>',
             '  </select>',
             '</label>',
             '<label class="esf-field" data-role="allowed-field">',
@@ -569,10 +561,12 @@
             '    placeholder="www.example.com"></textarea>',
             '  <span class="esf-hint">一行一个。支持全站或指定路径下页面禁用。</span>',
             '</label>',
+            // 「全局自动」/「全局手动」下两个名单都不显示，这里补一句模式说明（只在这两种模式下出现）。
+            '<span class="esf-hint" data-role="mode-hint"></span>',
         ].join('\n');
         function actionsBlock(withModel) {
-            // 站点那一组按钮带 data-role="site-action"：切到「全局」时整组藏起来
-            // （站点列表在全局模式下不生效，留着保存/恢复/添加没意义）。
+            // 站点那一组按钮带 data-role="site-action"：切到「全局自动」/「全局手动」时整组藏起来
+            // （站点列表在这两种模式下不生效，留着保存/恢复/添加没意义）。
             const site = withModel ? '' : ' data-role="site-action"';
             const btns = [
                 '<button type="button" class="esf-btn esf-btn-primary" data-act="save"' + site + '>保存设置</button>'
@@ -638,13 +632,6 @@
             '        <label class="esf-radio"><input type="radio" name="tooltipTrigger" data-k="tooltipTrigger" value="hover"><span>悬浮</span></label>',
             '        <label class="esf-radio"><input type="radio" name="tooltipTrigger" data-k="tooltipTrigger" value="click"><span>单击</span></label>',
             '        <label class="esf-radio"><input type="radio" name="tooltipTrigger" data-k="tooltipTrigger" value="longpress"><span>长按</span></label>',
-            '      </div>',
-            '    </div>',
-            '    <div class="esf-field">',
-            '      <span class="esf-label">正则识别方式</span>',
-            '      <div class="esf-radios" role="radiogroup" aria-label="正则识别方式">',
-            '        <label class="esf-radio"><input type="radio" name="regexMode" data-k="regexMode" value="auto"><span>自动</span></label>',
-            '        <label class="esf-radio"><input type="radio" name="regexMode" data-k="regexMode" value="click"><span>点击</span></label>',
             '      </div>',
             '    </div>',
             '    <div class="esf-field">',
@@ -913,6 +900,12 @@
                 requestAnimationFrame(ensureTrailingNewline);
             });
         }
+        // 「全局自动」/「全局手动」下两个名单都不生效，补一句模式说明。
+        // 用 style.display 而不是 hidden 属性 —— .esf-hint 是 display:block，会盖掉 [hidden] 的 display:none。
+        const MODE_HINTS = {
+            global: '所有网站都自动识别。',
+            disabled: '所有网站需每次手动点击“正则识别”按钮后才识别。'
+        };
         function syncSiteFields(mode) {
             const m = SITE_MODES.indexOf(mode) >= 0 ? mode : DEFAULTS.siteMode;
             const allow = root.querySelector('[data-role="allowed-field"]');
@@ -921,8 +914,14 @@
                 allow.style.display = m === 'custom' ? '' : 'none';
             if (block)
                 block.style.display = m === 'restricted' ? '' : 'none';
-            // 「全局」下站点列表不生效：保存设置 / 恢复默认 / 添加当前站点 都收起来。
-            const hideActions = m === 'global';
+            const hint = root.querySelector('[data-role="mode-hint"]');
+            if (hint) {
+                const text = MODE_HINTS[m] || '';
+                hint.textContent = text;
+                hint.style.display = text ? '' : 'none';
+            }
+            // 「全局自动」和「全局手动」下站点列表都不生效：保存设置 / 恢复默认 / 添加当前站点 都收起来。
+            const hideActions = m === 'global' || m === 'disabled';
             Array.from(root.querySelectorAll('[data-role="site-action"]')).forEach(function (el) {
                 el.style.display = hideActions ? 'none' : '';
             });
@@ -949,7 +948,6 @@
             const trigger = TOOLTIP_TRIGGERS.indexOf(String(values.tooltipTrigger)) >= 0
                 ? String(values.tooltipTrigger) : DEFAULTS.tooltipTrigger;
             setRadio('tooltipTrigger', trigger);
-            setRadio('regexMode', values.autoRegex === false ? 'click' : 'auto');
             setRadio('regexReplace', values.regexReplace === true ? 'replace' : 'keep');
             setRadio('annoCopy', values.copyAnno === true ? 'keep' : 'strip');
             setRadio('siteAnnotationMode', values.siteAnnotationMode === 'no-annotate' ? 'no-annotate' : 'annotate');
@@ -988,9 +986,6 @@
             const tt = radioValue('tooltipTrigger');
             if (tt)
                 out.tooltipTrigger = TOOLTIP_TRIGGERS.indexOf(tt) >= 0 ? tt : DEFAULTS.tooltipTrigger;
-            const rm = radioValue('regexMode');
-            if (rm)
-                out.autoRegex = rm !== 'click';
             const rr = radioValue('regexReplace');
             if (rr)
                 out.regexReplace = rr === 'replace';
@@ -1100,7 +1095,7 @@
                     custom: {
                         title: '自定义设置',
                         lines: [
-                            '弹框触发方式、正则识别方式、AI 缓存优先、复制标注纪年、文内标注限制、共和前纪年都回到默认值',
+                            '弹框触发方式、AI 缓存优先、复制标注纪年、文内标注限制、共和前纪年都回到默认值',
                             '站点设置、模型配置、更正记录、AI 缓存都不受影响'
                         ]
                     },
@@ -1281,20 +1276,6 @@
                 try {
                     const savedMode = await save(patchMode);
                     state = Object.assign({}, state, savedMode);
-                }
-                catch (err) {
-                    warn('保存设置失败', err);
-                }
-                return;
-            }
-            if (key === 'regexMode') {
-                // 「自动」= autoRegex true；「点击」= false（每次要在弹窗里手动点「正则识别」）
-                const patchMode = { autoRegex: radioValue('regexMode') !== 'click' };
-                try {
-                    const savedMode = await save(patchMode);
-                    state = Object.assign({}, state, savedMode);
-                    if (o.onChange)
-                        o.onChange(savedMode);
                 }
                 catch (err) {
                     warn('保存设置失败', err);

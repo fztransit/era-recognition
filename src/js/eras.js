@@ -152,6 +152,7 @@
             '(?<eraG>' + NAME_PART + ')' + SP + '(?<gz>' + GANZHI_PART + ')' + SP + '年',
             '(?<era>' + NAME_PART + ')' + SP + '(?<num>' + NUM_PART + ')' + SP + '年',
         ];
+        // 改元 + 年号
         parts.push('(?<=改元)' + SP + '(?<eraC>' + NAME_PART + ')');
         if (opts && opts.range) {
             parts.push('(?<eraR>' + NAME_PART + ')' + SP + '年(?:间|間|中|初|末)', '(?<eraM>' + NAME_PART + ')' + SP + '(?:中|初|末)' + RANGE_TAIL);

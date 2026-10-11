@@ -14,10 +14,8 @@
     const BEFORE_PUNCT = /[\s。．，、；;,：:？！?!…—～~「」『』“”‘’"'（）()〈〉《》【】\[\]{}·]/;
     // 除了标点，这几个字也算边界：「诏」（下诏…二年）、「其」（其二年＝它的第二年）。
     // 繁体「詔」一并收进来 —— 页面简繁两种写法都要认。
-    const BEFORE_WORDS = new Set(['诏', '詔', '其']);
-    function isBeforeBoundary(ch) {
-        return BEFORE_PUNCT.test(ch) || BEFORE_WORDS.has(ch);
-    }
+    const BEFORE_WORDS = new Set(['诏', '詔', '其', '起', '讫', '訖']);
+
     const BLOCK_TAGS = new Set([
         'P', 'DIV', 'LI', 'TD', 'TH', 'TR', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'PRE',
         'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'DD', 'DT', 'FIGCAPTION', 'MAIN', 'ASIDE',
@@ -40,11 +38,20 @@
     // 「没有年号的纪年」只看**同一个文本节点里**前一个字符是什么；节点开头就当作段首。
     // 不跨节点回看 —— 节点被拆开的情况只处理「年号 + 纪年被拆」（见 seedCrossNodeEra），
     // 标点/边界字不掺和，等真遇到具体问题再说。
-    function isBoundary(node, index) {
-        if (index > 0)
-            return isBeforeBoundary(String(node.nodeValue || '').charAt(index - 1));
-        return true;
+    function isBoundary(node, index) {  // 暂未处理跨节点
+        if (index <= 0)
+            return true;                                    // 节点开头 = 段首
+        const text = String(node.nodeValue || '');
+        const ch = text.charAt(index - 1);
+        if (BEFORE_PUNCT.test(ch))
+            return true;                                    // 前面就是标点
+        if (!BEFORE_WORDS.has(ch))
+            return false;                                   // 既不是标点也不是边界字
+        if (index - 1 <= 0)
+            return true;                                    // 边界字本身就在节点开头
+        return BEFORE_PUNCT.test(text.charAt(index - 2));   // 边界字前面也必须是标点
     }
+
     function embeddedYearOf(node) {
         let current = node && node.parentElement;
         for (let hop = 0; current && hop < 4; hop++, current = current.parentElement) {

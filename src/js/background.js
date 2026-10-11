@@ -4,7 +4,6 @@ const EraAI = self.EraAI;
 const EraCache = self.EraCache;
 const EraModels = self.EraModels;
 const READ_DEFAULTS = {
-    autoRegex: true,
     standalone: false,
     annotate: false,
     maxChars: 12000,

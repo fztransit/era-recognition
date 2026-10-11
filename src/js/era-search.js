@@ -42,6 +42,37 @@
         }
         return out;
     }
+    // 输入的年号还只是别的更长年号的开头时（「建武」→「建武中元」、「太平」→「太平興國」…），
+    // 把这些更长的年号也列出来 —— 侧边栏据此弹建议框，让用户挑到底要查哪个。
+    // 只比对年号名（不含朝代 / 帝号），且要求「严格更长 + 以输入开头」，不做中间包含匹配：
+    // 否则单字输入（「啟」）会把「光啟 / 天啟」这类中间命中的也一并拉进来。
+    function extensions(query, limit) {
+        const d = D();
+        const q = String(query || '').trim();
+        if (!d || !q)
+            return [];
+        const folded = fold(q);
+        if (!folded)
+            return [];
+        const max = limit > 0 ? limit : 20;
+        const seen = Object.create(null);
+        const out = [];
+        for (const e of (d.ERAS || [])) {
+            const name = String(e.name || '');
+            const fname = fold(name);
+            if (!fname || fname === folded || fname.indexOf(folded) !== 0)
+                continue;
+            if (seen[fname])
+                continue;
+            seen[fname] = 1;
+            out.push(name);
+        }
+        // 短的在前（「建武中元」比「建武中元某」更常见）。
+        out.sort(function (a, b) {
+            return a.length - b.length || (a < b ? -1 : a > b ? 1 : 0);
+        });
+        return out.slice(0, max);
+    }
     // 结尾的纪年：元年、中文二年～六十一年、或阿拉伯数字 1～61 年。
     // 不允许从错误写法内部截出一个较短的数字（例如「六十二年」里的「十二年」）。
     const YEAR_TAIL = new RegExp('(?<![二三四五六七八九十0-9０-９])(?:' + D().YEAR_NUM_PART + ')\\s*年$');
@@ -164,6 +195,7 @@
     }
     global.EraSearch = {
         search: search,
+        extensions: extensions,
         emperors: emperors,
         dynasties: dynasties,
         shortDynasty: shortDynasty,

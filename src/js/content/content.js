@@ -36,7 +36,7 @@
         if (C.aiWindowActive()) {
             setTimeout(function () { autoRecognize(); }, 500);
         }
-        else if (R.settings.autoRegex) {
+        else {
             setTimeout(function () { autoRecognize(); }, 400);
         }
         C.startObserver();
@@ -45,30 +45,26 @@
     // 「AI 缓存优先」= 开：先只查这个页面的 AI 缓存 ——
     //   命中：用 AI 缓存结果（runAI 会把 mode 设成 'ai'），**不跑正则**；
     //   没命中：安静退回正则识别（和「不优先」时完全一样）。
-    // 注意这一项只在「正则识别方式 = 自动」时有意义：方式是「点击」时本来就不自动识别。
+    // 只在站点允许自动识别时才会走到这里（「全局禁用」/ 禁用网站 / 自定义名单外都不自动跑）。
     function autoRecognize() {
         if (C.aiWindowActive()) {
             if (!R.state.busy)
                 C.runAI({ auto: true });
             return;
         }
-        if (!R.settings.autoRegex)
-            return;
         if (R.settings.regexReplace) {
             Promise.resolve(C.runAI({ auto: true, cacheOnly: true })).then(function (r) {
                 if (!r || !r.ok)
-                    safeRun('boot');
+                    safeRun();
             }, function () {
-                safeRun('boot');
+                safeRun();
             });
             return;
         }
-        safeRun('boot');
+        safeRun();
     }
-    function safeRun(reason) {
+    function safeRun() {
         try {
-            if (!R.settings.autoRegex && reason !== 'force')
-                return;
             R.scanRoot = null;
             C.runRegex();
         }
@@ -98,7 +94,7 @@
                 if (key === 'markTheme' || key === 'copyAnno')
                     C.applyMarkTheme();
                 if (typeof C.refreshCanvasEraMarks === 'function' &&
-                    ['standalone', 'autoRegex', 'enabled', 'siteMode', 'blockedSites', 'allowedSites', 'preRepublic', 'annotate', 'siteAnnotationMode', 'markTheme', 'regexReplace'].includes(key)) {
+                    ['standalone', 'enabled', 'siteMode', 'blockedSites', 'allowedSites', 'preRepublic', 'annotate', 'siteAnnotationMode', 'markTheme', 'regexReplace'].includes(key)) {
                     try {
                         C.refreshCanvasEraMarks();
                     }

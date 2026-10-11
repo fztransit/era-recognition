@@ -82,7 +82,7 @@ JavaScript、CSS、HTML 分目录；页面侧 JS 再按功能集中在 `src/js/c
 
 纪年数字 `NUM_PART` 统一限制为：`元`、中文数字 **二～六十一**（含合文 **廿 / 卅 / 卌**）、阿拉伯数字 **1～61**。中文纪年不支持「一」「零」「〇」，也不支持百、千、万。第一年统一写作「元年」。
 
-**省略年号的纪年**只认标准中文数字「元年」「二年」～「六十一年」，仍要求前面是标点、空白、段首或「诏 / 詔 / 其」；阿拉伯数字不走这一条，以免把普通公历年份误标成纪年。
+**省略年号的纪年**只认标准中文数字「元年」「二年」～「六十一年」，仍要求前面是标点、空白、段首或「诏 / 詔 / 其 / 起 / 讫 / 訖」；阿拉伯数字不走这一条，以免把普通公历年份误标成纪年。
 
 > 中文数字直接按 1～61 的合法结构匹配：二～九、十～十九、二十～五十九、六十～六十一，外加 **廿～廿九 / 卅～卅九 / 卌～卌九**（合文，`[廿卅卌][一二三四五六七八九]?`）。因此「三三年」「一二三年」「六十二年」「一年」「零年」「〇年」均不会被识别。
 > 合文那一段要写成**一个**分支（`[廿卅卌][一二三四五六七八九]?`），别拆成 `廿|廿[一二三四五六七八九]` —— 末尾「年」可选的地方（`era-search.js` / `sidepanel.js` / `content-annotation.js`）会先匹配上裸「廿」而不再回溯，把「廿一年」当成 20 年。
@@ -152,19 +152,24 @@ canvas 侧另外几个要点：
 
 ### 1.4 站点规则
 
-设置页「站点模式」三选一 + 两个名单（一行一个，可写 `www.example.com` 或 `www.example.com/path`）：
+设置页「站点模式」四选一 + 两个名单（一行一个，可写 `www.example.com` 或 `www.example.com/path`）：
 
 | 模式                  | 行为               |
 | ------------------- | ---------------- |
 | `restricted`（限制，默认） | 除**禁用网站**外都自动识别  |
 | `custom`（自定义）       | 只识别**自定义网站**名单内的 |
 | `global`（全局）        | 所有网站都自动识别（名单不生效） |
+| `disabled`（全局禁用）    | 所有网站都**不自动识别**，只能手动点识别按钮 |
 
-判定入口是 `content-state.js` 的 `autoRunAllowed()`，结果存在 `runtime.state.autoAllowed`。
+判定入口是 `content-state.js` 的 `autoRunAllowed()`，结果存在 `runtime.state.autoAllowed`。`disabled` 直接返回 `false`；`siteModeOf()` 的白名单也要带上它（漏了会被当成 `restricted`）。
 
 > **默认 `blockedSites` 是空的。** 识典古籍**不在**默认禁用列表里 —— 它的正文在 canvas 上，DOM 扫描器本来就标不到，识别由 canvas 适配负责。想关掉它，用户自己加进「禁用网站」即可。
 >
-> **禁用 ≠ 不能手动识别。** 禁用只影响「自动识别」：弹窗点「正则识别」照样能标出来，标记留在页面上。DOM 路径的 `runRegex()` 没有站点检查；canvas 路径靠 `canvas-adapter.js` 的模块级 `forced`（手动点过 → 本次会话内继续认），点「清除」时复位。
+> **禁用 ≠ 不能手动识别**（`disabled` 模式同理）。禁用只影响「自动识别」：弹窗点「正则识别」照样能标出来，标记留在页面上。DOM 路径的 `runRegex()` 没有站点检查；canvas 路径靠 `canvas-adapter.js` 的模块级 `forced`（手动点过 → 本次会话内继续认），点「清除」时复位。
+>
+> **`disabled` 与「禁用网站」的区别**：前者是**全局**开关（所有网页都要手动点，站点名单不生效、界面上两个名单和站点按钮都收起），后者只针对名单里的域名。两者可以叠加，但 `disabled` 一旦选中，名单就完全不起作用了。
+>
+> 回归：`.workbuddy-ai/repro/check-global-disable.cjs`（`siteModeOf` / `autoRunAllowed` 四模式 + 表单 DOM + 弹窗徽标提示 + `content.js` 自动识别开关，89 项）。
 
 ---
 
@@ -172,7 +177,19 @@ canvas 侧另外几个要点：
 
 ### 2.1 标记
 
-高亮是包在原文外的 `<span>`（`era-hl-mark` / canvas 的 `era-hl-canvas-mark`），**不改动原文一个字**。配色由 `markTheme`（amber / green / blue / pink / gray / none）控制，写成 `html[data-era-theme=...]`，CSS 里对应。
+高亮是包在原文外的 `<span>`（`era-hl-mark` / canvas 的 `era-hl-canvas-mark`），**不改动原文一个字**。配色由 `markTheme` 控制，写成 `html[data-era-theme=...]`，CSS 里对应。
+
+色卡菜单是**两行**，共 11 个值：
+
+| 行 | 值 | 适用 |
+|---|---|---|
+| 第一行 | `amber` / `green` / `blue` / `pink` / `gray` | 浅色网页：亮色淡涂 + 同色系下划线 |
+| 第二行 | `amber-dark` / `green-dark` / `blue-dark` / `pink-dark` / `gray-dark` | **深色网页**：同一色系，但底色更深更饱和、下划线挑亮色 —— 浅色变体压到深色页面上会被页面底色吃掉，看不出高亮 |
+| 跨两行 | `none` | 只标注，不高亮（网格里 `grid-row: 1 / span 2`） |
+
+> ⚠️ **加色卡要改三处，缺一不可**：`content-state.js` 的 `MARK_THEMES` 白名单（漏了会被 `applyMarkTheme()` 当非法值退回 `amber`）、`content.css` 的四组规则（mark / mark:hover / canvas-char / canvas-char:hover，另加 anno 与 canvas-anno 的配色）、`popup.js` 的 `MARK_THEMES`（`row` / `col` 是**显式**网格坐标，不靠自动排布 —— 那个跨两行的 `none` 会把自动排布挤错行）。
+>
+> `content.css` 里深色变体每个 id 应当正好 **6 条**规则；`check-theme-menu.cjs` 就是这么断言的。
 
 标记上挂的字段（`content-marker.js` 的 `createMark()`）：
 
@@ -465,6 +482,20 @@ canvas 没有 `__eraPrevEl`（标记是覆盖层，不在正文流里），对�
 
 > 复制页面文字自动查询的功能**已移除**，不要再加回来。
 
+### 5.5 输入是更长年号的开头 → 弹建议框让用户挑
+
+`建武` 本身是个年号（東漢光武帝等 7 条），但它同时是 **`建武中元`** 的开头。这类「短年号是长年号前缀」的情况，侧边栏会在结果之外**弹一个建议框**，把两者都列出来让用户选。
+
+- 判据是 `era-search.js` 的 `extensions(query, limit)`：只比对**年号名**（先 `fold()` 折简繁），要求「**严格更长 + 以输入开头**」，**不做中间包含匹配** —— 否则单字输入（`啟`）会把 `光啟 / 天啟` 这类中间命中的也拉进来。表里一共 17 对（建武→建武中元、太平→太平真君 / 太平興國 / 太平天國、太初→太初元將、大中→大中祥符 …）。
+- 触发还要过 `sidepanel.js` 的 `extensionPicks()`，**三个前提缺一不可**：
+  1. **片段落在输入末尾** —— `建武`、`汉武帝建武` 会弹；`建武三年` 不弹。用户已经把年号定下来了，而且 `applySug()` 是按「替换末尾片段」拼的，片段不在末尾会把纪年拼坏（`建武三年` → `建武建武中元三年`）。
+  2. **输入本身就是一条年号**（`D.lookupEra(frag)` 命中）—— `建武`、`太平` 是完整年号，该提示「建武中元 / 太平興國」；`武`、`太`、`天`、`貞` 这种半截输入**不是**，得留给原来的**帝号建议**。少了这一条，单字输入会把帝号弹框整支抢走（`武` 从「西漢 · 武帝…」变成一串年号）。★
+  3. 确实存在更长的同前缀年号。
+- 点建议项走原来的 `applySug(name)`（`clearFirst` 不传），所以 `汉武帝建武` 点「建武中元」得到的是 `汉武帝建武中元`，前缀保留。
+- 建议框本来只在「**还没查出结果**」时才出现，这里把闸门放宽成「**没结果 或 有更长同前缀年号**」（`input` 处理里的 `exts.length`）。选中后 `extensions` 为空，框自然收起。
+- ⚠️ **这个分支要排在帝号建议之前**。否则 `太平` 会先命中「太平天國」的帝号（洪秀全）→ 弹出一串帝号，反而没有年号可选。**但前提 2 保证了半截输入走不到这个分支**，帝号建议不受影响。
+- 回归：`.workbuddy-ai/repro/check-sidepanel-ext.cjs`（建武 / 太平 / 太初弹框 + 武 / 太 / 貞 仍走帝号建议 + 贞观 / 104 / 汉武帝 / 建武三年不弹 + 点击写回 + 前缀保留）。
+
 ---
 
 ## 六、存储与备份
@@ -485,12 +516,11 @@ canvas 没有 `__eraPrevEl`（标记是覆盖层，不在正文流里），对�
 | 键 | 默认 | 在哪改 | 说明 |
 |---|---|---|---|
 | `enabled` | `true` | 弹窗 | 总开关。关掉后所有网站都不自动识别，手动识别也被挡 |
-| `autoRegex` | `true` | 设置页 | 正则识别方式：自动 / 点击（设置页里显示为 `regexMode`） |
 | `regexReplace` | `false` | 设置页 | AI 缓存优先：页面有 AI 缓存就用缓存结果、不跑正则（设置页里显示为 `regexReplace`，见 6.8） |
 | `annotate` | `false` | 弹窗 | 文内标注 |
-| `markTheme` | `'amber'` | 弹窗 | 标注配色（色卡） |
+| `markTheme` | `'amber'` | 弹窗 | 标注配色（色卡）。两行共 11 个值，第二行 `*-dark` 是深色网页变体，见 2.1 |
 | `aiContinuous` | `'once'` | 弹窗 | 「连续使用」的次数：`once` / `20` / `100` / `300` / `999`（见 6.9）。老版本存的时长值（`'1h'` 之类）会被当作「单次」 |
-| `siteMode` / `allowedSites` / `blockedSites` | `restricted` / `[]` / `[]` | 设置页（弹窗也有折叠区） | 站点规则 |
+| `siteMode` / `allowedSites` / `blockedSites` | `restricted` / `[]` / `[]` | 设置页（弹窗也有折叠区） | 站点规则：`restricted` / `custom` / `global` / `disabled`（全局禁用，见 1.4） |
 | `tooltipTrigger` | `'click'` | 设置页 | 卡片触发方式 |
 | `copyAnno` | `false` | 设置页 | 复制时是否带上文内标注（设置页里显示为 `annoCopy`） |
 | `siteAnnotationMode` | `'annotate'` | 设置页 | 「文内标注限制」：对固定名单（识典）标注 / 不标注 |
@@ -524,7 +554,7 @@ canvas 没有 `__eraPrevEl`（标记是覆盖层，不在正文流里），对�
 | 按钮 | 位置 | 清掉什么 | 不碰什么 |
 |---|---|---|---|
 | 恢复默认（`data-scope="sites"`） | 站点设置区块 | 站点模式回「限制」+ 两个名单清空 | 模型配置（含 Key）、自定义设置、更正记录、AI 缓存 |
-| 恢复默认（`data-scope="custom"`） | 自定义设置区块的**右栏提示框里** | 弹框触发方式、正则识别方式、AI 缓存优先、复制标注纪年、文内标注限制、共和前纪年 回到默认值 | 站点设置、模型配置、更正记录、AI 缓存 |
+| 恢复默认（`data-scope="custom"`） | 自定义设置区块的**右栏提示框里** | 弹框触发方式、AI 缓存优先、复制标注纪年、文内标注限制、共和前纪年 回到默认值 | 站点设置、模型配置、更正记录、AI 缓存 |
 | 恢复默认（`data-scope="model"`） | AI 模型配置区块 | 所有模型配置**含已填的 API Key**、自定义模型，回到内置预设 | 站点设置、自定义设置、更正记录、AI 缓存 |
 
 三个作用域分别对应 `resetSiteSettings()` / `resetCustomSettings()` / `resetModelSettings()`；`resetAll()` = 三个一起（对外保留的名字）。**更正记录与 AI 缓存都在 `chrome.storage.local`，这三个按钮一个都不碰。**
@@ -575,7 +605,7 @@ if (!only && global.EraAiLogPanel && typeof global.EraAiLogPanel.mount === 'func
 
 设置页的「自定义设置」是**左 : 右 两栏**（`.esf-split`，`grid-template-columns: 3fr 2fr`，可调；别改成 flex 的 `flex: 3/2` —— `flex-basis` 分的是内容盒，右栏的 padding/border 会让视觉比例偏掉）：
 
-- 左栏 `.esf-split-main` 里是 6 个 `esf-field`（弹框触发方式 / 正则识别方式 / AI 缓存优先 / 复制标注纪年 / 文内标注限制 / 共和前纪年）；
+- 左栏 `.esf-split-main` 里是 5 个 `esf-field`（弹框触发方式 / AI 缓存优先 / 复制标注纪年 / 文内标注限制 / 共和前纪年）；
 - 右栏 `.esf-tipbox` **高度跟着左栏走**（grid 默认 `align-items: stretch`，所以右栏始终和左栏那一行等高，不要加 `align-items: start` 或 `position: sticky`）；内部是竖向 flex，按钮用 `margin-top: auto` 顶到**右下角**。
 
 右栏两种状态**互斥**（靠 `aside` 上的 `is-idle` 切换，见 `renderOptionTip()`）：
@@ -612,7 +642,7 @@ if (!only && global.EraAiLogPanel && typeof global.EraAiLogPanel.mount === 'func
 
 ### 6.8 「AI 缓存优先」
 
-「自定义设置」里的第 3 项，存储键 **`regexReplace`**（默认 `false` = 不优先）。
+「自定义设置」里的第 2 项，存储键 **`regexReplace`**（默认 `false` = 不优先）。
 
 | 选 | 打开页面时 |
 |---|---|
@@ -621,7 +651,7 @@ if (!only && global.EraAiLogPanel && typeof global.EraAiLogPanel.mount === 'func
 
 实现分三层，缺一层都不成立：
 
-1. **`content.js` 的 `autoRecognize()`**：`aiWindowActive()` → 照旧走 AI；否则 `autoRegex && regexReplace` 时先 `C.runAI({ auto: true, cacheOnly: true })`，返回 `ok:false` 才 `safeRun()`（= 正则）。它只在「正则识别方式 = 自动」时起作用 —— 方式是「点击」时本来就不自动识别，优先也无从谈起。改设置时（`storage.onChanged` 收到 `regexReplace`）会当场重来一遍。
+1. **`content.js` 的 `autoRecognize()`**：`aiWindowActive()` → 照旧走 AI；否则 `regexReplace` 时先 `C.runAI({ auto: true, cacheOnly: true })`，返回 `ok:false` 才 `safeRun()`（= 正则）。它只在**站点允许自动识别**时起作用（`autoAllowed`）—— 「全局禁用」/ 禁用网站 / 自定义名单外本来就不自动识别，优先也无从谈起。改设置时（`storage.onChanged` 收到 `regexReplace`）会当场重来一遍。
 2. **`background.js` 的 `analyzeWithCache(cfg, text, title, url, noCache, cacheOnly)`**：`cacheOnly` 时缓存没命中直接回 `{ ok:false, code:'NO_CACHE' }`，**不调接口**（否则一次探测白花 token）。
 3. **`content-ai.js`**：把 `cacheOnly` 透传给背景；收到 `NO_CACHE` 时**不写 `lastError`** —— 缓存没命中是正常情况，不是错误。
 
@@ -743,6 +773,9 @@ NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/repro13-regex-replace.c
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/repro14-settings-export.cjs # 导出带上设置（不含 Key）+ 导入恢复 + 脏值被挡
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/repro15-continuous-count.cjs # 「连续使用」次数：选项表 + 状态机 + 弹窗提示 + 页面自动识别
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/repro16-prompt-align.cjs     # 提示词与代码对齐 + parseResults 按年号表归一
+NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-sidepanel-ext.cjs     # 侧边栏：短年号是长年号前缀时弹建议框（建武 → 建武中元）
+NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-global-disable.cjs    # 「全局禁用」站点模式 + 「正则识别方式」已删除
+NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-theme-menu.cjs       # 色卡菜单两行（浅色 / 深色网页）+ 透明色跨两行 + *-dark 白名单与 CSS 规则
 ```
 
 ### 8.2 三个容易踩的实现坑

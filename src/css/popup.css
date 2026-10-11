@@ -545,7 +545,12 @@ body {
   left: 0;
   top: calc(100% + 4px);
   z-index: 20;
-  display: flex;
+  /* 两行色卡：第一行浅色网页、第二行深色网页；最后一格「透明」跨两行。
+     每格的行列坐标由 buildThemeMenu() 写在元素的行内样式上，不靠自动排布。
+     宽度 6 列 × 22px + 5 个 6px 间距 + 12px 内边距 + 2px 边框 = 176px，和改版前一行时一样。 */
+  display: grid;
+  grid-template-columns: repeat(6, 22px);
+  grid-auto-rows: 22px;
   gap: 6px;
   padding: 6px;
   border-radius: 9px;
@@ -566,8 +571,8 @@ body {
 }
 
 .pp-theme-item {
-  width: 22px;
-  height: 22px;
+  /* 尺寸交给网格轨道（22px 一格），**不要写死 width/height** ——
+     写死了之后「透明」那格虽然 grid-row: span 2，实际高度还是 22px，跨行白设。 */
   padding: 0;
   border-radius: 5px;
   border: 1px solid rgba(0, 0, 0, 0.22);
@@ -577,6 +582,12 @@ body {
 .pp-theme-item[aria-selected="true"] {
   outline: 2px solid var(--pp-accent);
   outline-offset: 1px;
+}
+
+/* 第二行（深色网页变体）的色块自带一层深色底，在深色弹窗里要能看出边界。 */
+.pp-theme-item[data-row="2"],
+.pp-theme-swatch.pp-theme-dark {
+  border-color: rgba(255, 255, 255, 0.32);
 }
 
 /* 色卡挪到「正则重置」右侧后，跟它隔开一点（.pp-cont-row 本身 gap: 0） */

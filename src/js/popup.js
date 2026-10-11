@@ -97,9 +97,12 @@
         if (!stats)
             return;
         if (!stats.autoAllowed && stats.mode === 'idle') {
-            setAlert(stats.blocked
-                ? '此站点在禁用列表中，不会自动识别。可以点击"正则识别"单次识别。'
-                : '自定义模式：这个站不在「自定义网站」名单里，所以没自动识别。手动点「正则识别」可以单次识别；想让它以后自动识别，要在设置里把域名加进名单。', 'warn');
+            if (stats.siteMode === 'disabled')
+                setAlert('已全局禁用自动识别：所有网页都需要在弹窗里点「正则识别」手动识别。', 'warn');
+            else if (stats.blocked)
+                setAlert('此站点在禁用列表中，不会自动识别。可以点击"正则识别"单次识别。', 'warn');
+            else
+                setAlert('自定义模式：该网站不在「自定义网站」名单里，仍可手动点击"正则识别"单次识别。', 'warn');
             return;
         }
         if (stats.mode === 'ai')
@@ -126,10 +129,10 @@
         if (!stats.autoAllowed && mode === 'idle') {
             $('pp-count').textContent = '–';
             badge.className = 'pp-stat-badge';
-            badge.textContent = stats.blocked ? '已禁用' : '未启用';
-            note.textContent = stats.blocked
-                ? '禁用网站 · 未识别'
-                : '自定义模式 · 未识别';
+            badge.textContent = stats.siteMode === 'disabled' ? '全局禁用' : (stats.blocked ? '已禁用' : '未启用');
+            note.textContent = stats.siteMode === 'disabled'
+                ? '全局禁用 · 需手动识别'
+                : (stats.blocked ? '禁用网站 · 未识别' : '自定义模式 · 未识别');
             $('btn-ai').setAttribute('aria-pressed', 'false');
             $('btn-regex').setAttribute('aria-pressed', 'false');
             if (extra)
@@ -139,9 +142,9 @@
         $('pp-count').textContent = mode === 'idle' ? '–' : String(stats.count || 0);
         const aiMode = mode === 'ai';
         $('btn-ai').setAttribute('aria-pressed', aiMode ? 'true' : 'false');
-        const regexMode = mode === 'regex' ||
+        const regexOn = mode === 'regex' ||
             (mode === 'idle' && stats.autoAllowed && !stats.userCleared);
-        $('btn-regex').setAttribute('aria-pressed', regexMode ? 'true' : 'false');
+        $('btn-regex').setAttribute('aria-pressed', regexOn ? 'true' : 'false');
         badge.className = 'pp-stat-badge';
         if (mode === 'ai') {
             badge.textContent = stats.cached ? 'AI · 缓存' : 'AI 识别';
@@ -241,25 +244,42 @@
         const btn = $('btn-annotate');
         btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
+    // 色卡菜单：两行 —— 第一行适用浅色网页，第二行是「对应」的深色网页变体
+    // （同一色系，底色更深更饱和、下划线更亮，免得浅色变体在深色页面上被页面底色吃掉）。
+    // 最后一格「透明」跨上下两行（grid-row: 1 / span 2）。
+    // row / col 是显式网格坐标（不靠自动排布，省得 span 那一格把后面挤错行）。
+    const DARK_PAGE = '#14161b';   // 第二行色块的预览底：假装它贴在深色网页上
     const MARK_THEMES = [
-        { id: 'amber', color: '#ffd047' },
-        { id: 'green', color: '#66d68c' },
-        { id: 'blue', color: '#60b4ff' },
-        { id: 'pink', color: '#ff82b4' },
-        { id: 'gray', color: '#b4bac4' },
-        { id: 'none', color: 'transparent', slash: true }
+        { id: 'amber', name: '琥珀', color: '#ffd047', row: 1, col: 1 },
+        { id: 'green', name: '绿', color: '#66d68c', row: 1, col: 2 },
+        { id: 'blue', name: '蓝', color: '#60b4ff', row: 1, col: 3 },
+        { id: 'pink', name: '粉', color: '#ff82b4', row: 1, col: 4 },
+        { id: 'gray', name: '灰', color: '#b4bac4', row: 1, col: 5 },
+        { id: 'none', name: '透明', color: 'transparent', slash: true, row: 1, col: 6, spanRows: 2 },
+        { id: 'amber-dark', name: '琥珀', fill: 'rgba(255, 178, 0, 0.40)', underline: 'rgba(255, 214, 92, 1)', row: 2, col: 1 },
+        { id: 'green-dark', name: '绿', fill: 'rgba(38, 198, 118, 0.38)', underline: 'rgba(126, 232, 176, 1)', row: 2, col: 2 },
+        { id: 'blue-dark', name: '蓝', fill: 'rgba(74, 152, 255, 0.40)', underline: 'rgba(140, 200, 255, 1)', row: 2, col: 3 },
+        { id: 'pink-dark', name: '粉', fill: 'rgba(255, 84, 160, 0.38)', underline: 'rgba(255, 162, 206, 1)', row: 2, col: 4 },
+        { id: 'gray-dark', name: '灰', fill: 'rgba(176, 188, 210, 0.34)', underline: 'rgba(214, 222, 238, 1)', row: 2, col: 5 }
     ];
     function buildThemeMenu(current) {
         const menu = $('pp-theme-menu');
         const swatch = $('pp-theme-swatch');
         if (!menu || !swatch)
             return;
+        // 深色变体：把「深色网页底 + 该色淡涂 + 亮下划线」一起画出来，菜单里看到的就是页面上的样子。
+        // 用 background-color + background-image 分开写，别用 `background: a, b` 那种多层简写 ——
+        // 简写的解析在不同实现里不一致（有的会把最后一层的颜色丢掉，色块直接变透明）。
         function paint(el, t) {
-            el.style.background = t.color;
+            el.style.backgroundColor = t.slash ? 'transparent' : (t.fill ? DARK_PAGE : t.color);
+            el.style.backgroundImage = t.fill ? 'linear-gradient(' + t.fill + ', ' + t.fill + ')' : '';
+            el.style.boxShadow = t.underline ? 'inset 0 -3px 0 0 ' + t.underline : '';
             el.classList.toggle('pp-theme-none', !!t.slash);
+            el.classList.toggle('pp-theme-dark', !!t.fill);
         }
         const curTheme = MARK_THEMES.filter(function (x) { return x.id === current; })[0] || MARK_THEMES[0];
         paint(swatch, curTheme);
+        $('btn-theme').title = '标注颜色样式 · 当前：' + curTheme.name + (curTheme.fill ? '（深色网页）' : (curTheme.slash ? '（只标注不高亮）' : '（浅色网页）'));
         menu.textContent = '';
         for (const t of MARK_THEMES) {
             const item = document.createElement('button');
@@ -267,12 +287,18 @@
             item.className = 'pp-theme-item';
             item.setAttribute('role', 'option');
             item.setAttribute('data-theme', t.id);
+            item.setAttribute('data-row', String(t.row));
             item.setAttribute('aria-selected', String(t.id === current));
+            item.style.gridColumn = String(t.col);
+            item.style.gridRow = t.spanRows ? t.row + ' / span ' + t.spanRows : String(t.row);
+            item.title = t.name + '：' + (t.slash
+                ? '只标注，不高亮'
+                : (t.fill ? '适用深色网页背景' : '适用浅色网页背景'));
             paint(item, t);
             menu.appendChild(item);
         }
     }
-    const SITE_MODES = ['restricted', 'custom', 'global'];
+    const SITE_MODES = ['restricted', 'custom', 'global', 'disabled'];
     function paintEnabled(on) {
         const btn = $('btn-power');
         if (!btn)
@@ -390,7 +416,9 @@
                     setAlert(r.error || '正则识别失败', 'err');
                 }
                 else {
-                    const tail = r.blocked ? ' 此站点在禁用列表中，每次都要手动点。' : '';
+                    const tail = r.siteMode === 'disabled'
+                        ? ' 当前为「全局禁用」，每次都要手动点。'
+                        : (r.blocked ? ' 此站点在禁用列表中，每次都要手动点。' : '');
                     setAlert((r.count ? '正则识别完成，命中 ' + r.count + ' 处。' : '正则没有在当前页面找到年号。') + tail, r.count ? 'ok' : 'warn');
                 }
             }
@@ -568,7 +596,8 @@
             }
             clearTimeout(themeHideTimer);
             themeHideTimer = 0;
-            menu.style.display = 'flex';
+            // 色卡菜单是 grid（两行）：这里必须写 'grid'，写 'flex' 会把第二行挤成一列。
+            menu.style.display = 'grid';
             this.setAttribute('aria-expanded', 'true');
         });
         $('pp-theme-menu').addEventListener('click', async function (e) {

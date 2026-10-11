@@ -29,6 +29,21 @@ html[data-era-hl][data-era-theme="pink"] .era-hl-mark:hover { background: rgba(2
 html[data-era-hl][data-era-theme="gray"] .era-hl-mark { background: rgba(180, 186, 196, 0.36); border-bottom-color: rgba(120, 128, 140, 0.92); }
 html[data-era-hl][data-era-theme="gray"] .era-hl-mark:hover { background: rgba(160, 168, 180, 0.58); }
 
+/* 深色网页变体（*-dark）：同一色系，但底色更深更饱和、下划线更亮。
+   浅色变体是「亮色淡涂」，压到深色页面上会被页面底色吃掉、看不出高亮；
+   这一套反过来 —— 用较暗的饱和底色在深底上划出一块，下划线挑亮色，白字仍读得清。
+   ⚠️ 色卡菜单里的第二行、content-state.js 的 MARK_THEMES 白名单要和这里一一对应。 */
+html[data-era-hl][data-era-theme="amber-dark"] .era-hl-mark { background: rgba(255, 178, 0, 0.40); border-bottom-color: rgba(255, 214, 92, 1); }
+html[data-era-hl][data-era-theme="amber-dark"] .era-hl-mark:hover { background: rgba(255, 178, 0, 0.58); }
+html[data-era-hl][data-era-theme="green-dark"] .era-hl-mark { background: rgba(38, 198, 118, 0.38); border-bottom-color: rgba(126, 232, 176, 1); }
+html[data-era-hl][data-era-theme="green-dark"] .era-hl-mark:hover { background: rgba(38, 198, 118, 0.56); }
+html[data-era-hl][data-era-theme="blue-dark"] .era-hl-mark { background: rgba(74, 152, 255, 0.40); border-bottom-color: rgba(140, 200, 255, 1); }
+html[data-era-hl][data-era-theme="blue-dark"] .era-hl-mark:hover { background: rgba(74, 152, 255, 0.58); }
+html[data-era-hl][data-era-theme="pink-dark"] .era-hl-mark { background: rgba(255, 84, 160, 0.38); border-bottom-color: rgba(255, 162, 206, 1); }
+html[data-era-hl][data-era-theme="pink-dark"] .era-hl-mark:hover { background: rgba(255, 84, 160, 0.56); }
+html[data-era-hl][data-era-theme="gray-dark"] .era-hl-mark { background: rgba(176, 188, 210, 0.34); border-bottom-color: rgba(214, 222, 238, 1); }
+html[data-era-hl][data-era-theme="gray-dark"] .era-hl-mark:hover { background: rgba(176, 188, 210, 0.52); }
+
 html[data-era-hl] .era-hl-anno {
   display: inline;
   padding: 0 1px;
@@ -63,6 +78,11 @@ html[data-era-hl][data-era-theme="green"] .era-hl-anno { background: rgba(102, 2
 html[data-era-hl][data-era-theme="blue"] .era-hl-anno { background: rgba(96, 180, 255, 0.16); }
 html[data-era-hl][data-era-theme="pink"] .era-hl-anno { background: rgba(255, 130, 180, 0.15); }
 html[data-era-hl][data-era-theme="gray"] .era-hl-anno { background: rgba(180, 186, 196, 0.17); }
+html[data-era-hl][data-era-theme="amber-dark"] .era-hl-anno { background: rgba(255, 178, 0, 0.24); }
+html[data-era-hl][data-era-theme="green-dark"] .era-hl-anno { background: rgba(38, 198, 118, 0.22); }
+html[data-era-hl][data-era-theme="blue-dark"] .era-hl-anno { background: rgba(74, 152, 255, 0.23); }
+html[data-era-hl][data-era-theme="pink-dark"] .era-hl-anno { background: rgba(255, 84, 160, 0.22); }
+html[data-era-hl][data-era-theme="gray-dark"] .era-hl-anno { background: rgba(176, 188, 210, 0.21); }
 html[data-era-hl][data-era-theme="none"] .era-hl-mark,
 html[data-era-hl][data-era-theme="none"] .era-hl-anno,
 html[data-era-hl][data-era-theme="none"] .era-hl-mark:hover {
@@ -299,12 +319,22 @@ html[data-era-hl][data-era-theme="green"] .era-hl-canvas-char { background: rgba
 html[data-era-hl][data-era-theme="blue"] .era-hl-canvas-char { background: rgba(96, 180, 255, 0.34); border-bottom-color: rgba(30, 110, 220, 0.92); }
 html[data-era-hl][data-era-theme="pink"] .era-hl-canvas-char { background: rgba(255, 130, 180, 0.32); border-bottom-color: rgba(210, 50, 120, 0.92); }
 html[data-era-hl][data-era-theme="gray"] .era-hl-canvas-char { background: rgba(180, 186, 196, 0.36); border-bottom-color: rgba(120, 128, 140, 0.92); }
+html[data-era-hl][data-era-theme="amber-dark"] .era-hl-canvas-char { background: rgba(255, 178, 0, 0.40); border-bottom-color: rgba(255, 214, 92, 1); }
+html[data-era-hl][data-era-theme="green-dark"] .era-hl-canvas-char { background: rgba(38, 198, 118, 0.38); border-bottom-color: rgba(126, 232, 176, 1); }
+html[data-era-hl][data-era-theme="blue-dark"] .era-hl-canvas-char { background: rgba(74, 152, 255, 0.40); border-bottom-color: rgba(140, 200, 255, 1); }
+html[data-era-hl][data-era-theme="pink-dark"] .era-hl-canvas-char { background: rgba(255, 84, 160, 0.38); border-bottom-color: rgba(255, 162, 206, 1); }
+html[data-era-hl][data-era-theme="gray-dark"] .era-hl-canvas-char { background: rgba(176, 188, 210, 0.34); border-bottom-color: rgba(214, 222, 238, 1); }
 html[data-era-hl][data-era-theme="none"] .era-hl-canvas-char { background: transparent; border-bottom-color: transparent; }
 html[data-era-hl] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(255, 190, 20, 0.62); }
 html[data-era-hl][data-era-theme="green"] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(70, 200, 120, 0.58); }
 html[data-era-hl][data-era-theme="blue"] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(70, 160, 255, 0.58); }
 html[data-era-hl][data-era-theme="pink"] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(255, 100, 160, 0.56); }
 html[data-era-hl][data-era-theme="gray"] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(160, 168, 180, 0.58); }
+html[data-era-hl][data-era-theme="amber-dark"] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(255, 178, 0, 0.58); }
+html[data-era-hl][data-era-theme="green-dark"] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(38, 198, 118, 0.56); }
+html[data-era-hl][data-era-theme="blue-dark"] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(74, 152, 255, 0.58); }
+html[data-era-hl][data-era-theme="pink-dark"] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(255, 84, 160, 0.56); }
+html[data-era-hl][data-era-theme="gray-dark"] .era-hl-canvas-mark:hover .era-hl-canvas-char { background: rgba(176, 188, 210, 0.52); }
 html[data-era-hl] .era-hl-canvas-anno {
   position: absolute;
   box-sizing: border-box;
@@ -328,5 +358,11 @@ html[data-era-hl][data-era-theme="green"] .era-hl-canvas-anno { background: rgba
 html[data-era-hl][data-era-theme="blue"] .era-hl-canvas-anno { background: rgba(16, 25, 36, 0.88); color: #7cc0ff; }
 html[data-era-hl][data-era-theme="pink"] .era-hl-canvas-anno { background: rgba(34, 19, 27, 0.88); color: #ff9ac6; }
 html[data-era-hl][data-era-theme="gray"] .era-hl-canvas-anno { background: rgba(24, 25, 28, 0.88); color: #c8cfda; }
+/* 深色变体的标注标签：底色比浅色变体再压暗一点（深色页面上本来就不需要那么亮的底）。 */
+html[data-era-hl][data-era-theme="amber-dark"] .era-hl-canvas-anno { background: rgba(28, 22, 8, 0.9); color: #ffd047; }
+html[data-era-hl][data-era-theme="green-dark"] .era-hl-canvas-anno { background: rgba(12, 28, 21, 0.9); color: #7ee0a6; }
+html[data-era-hl][data-era-theme="blue-dark"] .era-hl-canvas-anno { background: rgba(11, 22, 36, 0.9); color: #7cc0ff; }
+html[data-era-hl][data-era-theme="pink-dark"] .era-hl-canvas-anno { background: rgba(31, 13, 24, 0.9); color: #ff9ac6; }
+html[data-era-hl][data-era-theme="gray-dark"] .era-hl-canvas-anno { background: rgba(20, 21, 24, 0.9); color: #c8cfda; }
 /* 透明色卡：高亮不画，但标注仍然显示 —— 用中性灰，别硬塞一个琥珀色。 */
 html[data-era-hl][data-era-theme="none"] .era-hl-canvas-anno { background: rgba(24, 25, 28, 0.88); color: #c8cfda; }
