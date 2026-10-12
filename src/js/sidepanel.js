@@ -488,19 +488,19 @@
         const off = Number(row && row.offset);
         return Number.isFinite(off) && off > 1 ? '起' + Math.floor(off) + '年' : '';
     }
-    // 「这个年号下每一年」：从第 1 年开始逐个数，直到超过表里的 end。
-    // 表里第 6 列 offset = 「start 那一年已经是第几年」（天會：968 是十二年 → 第 1 年 = 957），
-    // 所以最大年数 = offset + (end - start)。start / end 不可知（夏商那些只有王名的 44 条）→
-    // 返回 null，那一行不给展开。全表最长的年号是 64 年（齊·前莊公），逐条枚举很便宜。
+    // 展开当前数据条目实际覆盖的年份，不反推该年号在更早年份的纪年。
+    // offset =「start 那一年已经是第几年」：后晋出帝天福从 943 年起、offset=8，
+    // 因此该条目只展开天福八年（943），不把高祖时期的天福元年至七年也列进来。
+    // 起止年不可知（夏商那些只有王名的条目）或范围无效时，不提供展开。
     function yearListOf(row) {
-        if (yearsUnknown(row))
+        if (yearsUnknown(row) || row.end < row.start)
             return null;
         const off = Number.isFinite(row.offset) && row.offset >= 1 ? Math.floor(row.offset) : 1;
         const max = off + (row.end - row.start);
-        if (!Number.isFinite(max) || max < 1)
+        if (!Number.isFinite(max) || max < off)
             return null;
         const out = [];
-        for (let n = 1; n <= max; n++) {
+        for (let n = off; n <= max; n++) {
             const year = D.eraYear(row.start, n, off);
             if (!Number.isFinite(year) || year > row.end)
                 break;
