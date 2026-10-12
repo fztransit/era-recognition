@@ -6,9 +6,10 @@
     const D = C.D;
     const MT = C.MT;
     const R = C.runtime;
-    const BARE_GZ = /([甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])年/g;
+    // 年份标记认「年」也认「載 / 载」（唐玄宗天寶三年起改「年」為「載」）。见 eras.js 的 YEAR_MARK。
+    const BARE_GZ = /([甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])(?:年|載|载)/g;
     // 省略年号的纪年只认标准中文数字：元年、二年～六十一年。
-    const BARE_YEAR = new RegExp('(' + D.CN_YEAR_PART + ')年', 'g');
+    const BARE_YEAR = new RegExp('(' + D.CN_YEAR_PART + ')' + D.YEAR_MARK, 'g');
     // 「没有年号的纪年」（如「二年」「三十三年」）只看它**前面**是什么 —— 段首也算边界。
     // 注意：全角逗号「，」和半角逗号「,」必须收在这里，否则「，二年」判不出来。
     const BEFORE_PUNCT = /[\s。．，、；;,：:？！?!…—～~「」『』“”‘’"'（）()〈〉《》【】\[\]{}·]/;
@@ -25,7 +26,7 @@
     const DISPLAYED_YEAR_RE = /^(?:(?:公元前|前)\s*(\d+)|BC\s*(\d+)|([+-]?\d+))\s*年$/i;
     const BLOCK_SELECTOR = Array.from(BLOCK_TAGS).map(function (t) { return t.toLowerCase(); }).join(',');
     // 文本节点「开头就是纪年」的形态，用于跨节点续接的判定。
-    const BARE_YEAR_HEAD = new RegExp('^(' + D.CN_YEAR_PART + ')年');
+    const BARE_YEAR_HEAD = new RegExp('^(' + D.CN_YEAR_PART + ')' + D.YEAR_MARK);
     const MAX_ERA_LEN = 8;
 
     function getScanRoot(force) {
@@ -203,11 +204,18 @@
                 const info = D.resolve(match);
                 if (!info || !info.length)
                     continue;
+                // 范围写法（貞觀年間 / 貞觀中）也把紧挨在前面的朝代一起圈进来，和 era/eraG 一致。
+                const hlIndex = match.index - D.whoPrefixLength(text.slice(0, match.index));
+                // eraM（年号 + 中/初/末，不带「年」字）额外要求**整段高亮起点**前面是标点 / 段首：
+                // 「，太和中詔」要认（后面紧跟「詔」也认），但「。周广顺末」的起点是「周」、
+                // 「。唐貞觀末」的起点是「唐」—— 判的是这些前缀的前面，所以只能在算完 hlIndex 之后判，
+                // 正则里做不到（正则看不到前缀）。同一条规则在 canvas-adapter.js 里也有一份，改要同步。
+                if (groups.eraM && !isBoundary(node, hlIndex))
+                    continue;
                 rangeHits.push({
                     index: match.index,
                     end: match.index + match[0].length,
-                    // 范围写法（貞觀年間 / 貞觀中）也把紧挨在前面的朝代一起圈进来，和 era/eraG 一致。
-                    hlIndex: match.index - D.whoPrefixLength(text.slice(0, match.index)),
+                    hlIndex,
                     info,
                     range: true
                 });

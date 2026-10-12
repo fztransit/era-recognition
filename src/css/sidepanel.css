@@ -238,6 +238,10 @@ body {
   white-space: nowrap;
 }
 
+.sp-era-count {
+  color: var(--sp-fg-dim);
+}
+
 .sp-greg {
   display: block;
   font-size: 11.5px;
@@ -302,4 +306,57 @@ body {
 
 .sp-row-pick {
   cursor: pointer;
+}
+
+/* 年号行可展开：点一下在行下面列出该年号每一年（左边纪年，右边「公元年 + 干支」）。 */
+.sp-row-expand {
+  cursor: pointer;
+}
+.sp-row-expand:hover {
+  background: var(--sp-hover);
+}
+.sp-row-expand .sp-era::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  margin-right: 1px;
+  color: var(--sp-fg-dim);
+  font-size: 10px;
+  vertical-align: 1px;
+}
+.sp-row-expand[aria-expanded="true"] .sp-era::before {
+  content: "▾";
+}
+.sp-yearlist {
+  /* 左边缩进到和「年号」文字对齐（行内 padding 10px + 前面那个 1em 的箭头位）。 */
+  padding: 0 10px 6px 23px;
+}
+.sp-yearlist-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1em;
+  padding: 2px 0;
+  font-size: 12px;
+}
+.sp-yearlist-val {
+  display: inline-flex;
+  gap: 1em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sp-yearlist-gz {
+  color: var(--sp-fg-dim);
+}
+
+/* 帝号展开后的「年号列表」：缩进到和帝号文字对齐，行更紧凑（行本身还能再展开成每年）。 */
+.sp-eralist {
+  padding: 0 0 6px 23px;
+}
+.sp-eralist > .sp-row {
+  padding: 3px 10px 3px 0;
+  border: 0;
+}
+.sp-eralist > .sp-row > .sp-row-left > .sp-era {
+  font-weight: 500;
 }

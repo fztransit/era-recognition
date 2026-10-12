@@ -73,9 +73,9 @@
         });
         return out.slice(0, max);
     }
-    // 结尾的纪年：元年、中文二年～六十一年、或阿拉伯数字 1～61 年。
+    // 结尾的纪年：元年、中文二年～六十一年、或阿拉伯数字 1～61 年（「年」也写作「載 / 载」）。
     // 不允许从错误写法内部截出一个较短的数字（例如「六十二年」里的「十二年」）。
-    const YEAR_TAIL = new RegExp('(?<![二三四五六七八九十0-9０-９])(?:' + D().YEAR_NUM_PART + ')\\s*年$');
+    const YEAR_TAIL = new RegExp('(?<![二三四五六七八九十0-9０-９])(?:' + D().YEAR_NUM_PART + ')\\s*' + D().YEAR_MARK + '$');
     function stripYearTail(text) {
         return String(text == null ? '' : text).replace(YEAR_TAIL, '').trim();
     }

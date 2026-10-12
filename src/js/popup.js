@@ -451,9 +451,15 @@
             const btn = this;
             userActed = true;
             busy(btn, true);
-            setAlert('正在清除本页更正，并用正则重新识别…', 'warn');
+            // 「正在清除…」**不要立刻写**：清除更正 + 重扫通常几十毫秒就回来，
+            // 黄色提示会一闪而过再变绿（用户反馈过；和 runAi 里「正在调用…」同一个毛病）。
+            // 拖过 500ms 还没回来才显示 —— 真慢的时候该有的进度提示还在，快的时候就看不到闪烁。
+            const hintTimer = setTimeout(function () {
+                setAlert('正在清除本页更正，并用正则重新识别…', 'warn');
+            }, 500);
             try {
                 const r = await send({ type: 'RUN_REGEX', reset: true });
+                clearTimeout(hintTimer);
                 render(r);
                 if (r && r.ok === false) {
                     setAlert(r.error || '正则重置失败', 'err');
@@ -469,9 +475,11 @@
                 }
             }
             catch (e) {
+                clearTimeout(hintTimer);
                 setAlert(String((e && e.message) || e), 'err');
             }
             finally {
+                clearTimeout(hintTimer);
                 busy(btn, false);
             }
         });

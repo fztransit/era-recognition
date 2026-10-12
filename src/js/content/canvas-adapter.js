@@ -14,8 +14,9 @@
     // 和普通网站一致 —— 禁用只是「不自动识别」，手动点一次还是能标出来，标记留在页面上。
     let forced = false;
 
-    const BARE_GZ = /([甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])年/g;
-    const BARE_YEAR = new RegExp('(' + D.CN_YEAR_PART + ')年', 'g');
+    // 年份标记认「年」也认「載 / 载」（唐玄宗天寶三年起改「年」為「載」）。见 eras.js 的 YEAR_MARK。
+    const BARE_GZ = /([甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])(?:年|載|载)/g;
+    const BARE_YEAR = new RegExp('(' + D.CN_YEAR_PART + ')' + D.YEAR_MARK, 'g');
     const BEFORE_PUNCT = /[\s。．，、；;,：:？！?!…—～~「」『』“”‘’"'（）()〈〉《》【】\[\]{}·]/;
     const BEFORE_WORDS = new Set(['诏', '詔', '其', '起', '讫', '訖']);
 
@@ -160,6 +161,11 @@
             const hlIndex = (groups.era || groups.eraG || groups.eraR || groups.eraM)
                 ? m.index - D.whoPrefixLength(text.slice(0, m.index))
                 : m.index;
+            // eraM（年号 + 中/初/末，不带「年」字）额外要求**整段高亮起点**前面是标点 / 段首。
+            // 判在 hlIndex 上而不是 m.index 上 —— 高亮起点可能包含朝代 / 帝号前缀
+            // （「。周广顺末」的起点是「周」）。和 content-scanner.js 里那份是同一条规则，改要同步。
+            if (groups.eraM && !isBoundary(text, hlIndex))
+                continue;
             fullHits.push({
                 index: m.index,
                 end: m.index + m[0].length,

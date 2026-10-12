@@ -171,7 +171,7 @@
         if (!era)
             return raw || '年号';
         const hasEra = D.lookupEra(raw.slice(0, 2)).length > 0 || D.lookupEra(raw.slice(0, 3)).length > 0;
-        const num = raw.match(new RegExp('(?<![二三四五六七八九十0-9０-９])(' + D.YEAR_NUM_PART + ')\\s*年\\s*$'));
+        const num = raw.match(new RegExp('(?<![二三四五六七八九十0-9０-９])(' + D.YEAR_NUM_PART + ')\\s*' + D.YEAR_MARK + '\\s*$'));
         const hasCount = !!num;
         if (hasEra && hasCount) {
             const count = num ? D.cnToNumber(num[1]) : NaN;

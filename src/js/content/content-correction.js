@@ -198,9 +198,10 @@
             C.positionPopupGroup();
     }
     const RANGE_FORM = D.RANGE_FORM;
-    // 「…年」/「…甲子年」这类纪年尾巴；干支继续保留。
+    // 「…年」/「…載」/「…甲子年」这类纪年尾巴；干支继续保留。
+    // 「載」见 eras.js 的 YEAR_MARK —— 唐玄宗天寶三年起把「年」写作「載」。
     const GANZHI_TAIL = '[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]';
-    const CHRONO_TAIL = new RegExp('^(?:' + D.YEAR_NUM_PART + '|' + GANZHI_TAIL + ')年$');
+    const CHRONO_TAIL = new RegExp('^(?:' + D.YEAR_NUM_PART + '|' + GANZHI_TAIL + ')' + D.YEAR_MARK + '$');
     // 年号后面那一截可以是什么：空（整个标记就是年号，如「改元永興」）、
     // 纪年（「建元三年」）、范围写法（「永興年間 / 貞觀中」）。
     // 少了后两种，「永興年間」这类标记点更正后输入框和候选都是空的。
@@ -226,8 +227,8 @@
     }
     function chronologyOnly(mark) {
         const raw = C.eraTextOf(mark);
-        // 只有纪年、没有年号的片段：标准中文数字或干支。
-        return new RegExp('^(?:' + D.CN_YEAR_PART + '|' + GANZHI_TAIL + ')年$').test(raw);
+        // 只有纪年、没有年号的片段：标准中文数字或干支（「三年」/「三載」/「甲子年」）。
+        return new RegExp('^(?:' + D.CN_YEAR_PART + '|' + GANZHI_TAIL + ')' + D.YEAR_MARK + '$').test(raw);
     }
     function prepareFixInput(mark) {
         const panel = ensureFixPanel();
@@ -324,7 +325,7 @@
         // 裸的「二年」最初没有 __eraInfo，因此更正前 mark.__eraN 可能为空。
         // 一旦更正到具体年号，就必须把正文中的年数补回标记，否则候选只能显示年号起止年。
         if (!Number.isFinite(mark.__eraN) && !mark.__eraGz && chronologyOnly(mark)) {
-            const m = new RegExp('^(' + D.CN_YEAR_PART + ')年$').exec(C.eraTextOf(mark));
+            const m = new RegExp('^(' + D.CN_YEAR_PART + ')' + D.YEAR_MARK + '$').exec(C.eraTextOf(mark));
             if (m) {
                 const n = m[1] === '元' ? 1 : D.cnToNumber(m[1]);
                 if (Number.isFinite(n))

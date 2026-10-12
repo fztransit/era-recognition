@@ -145,17 +145,40 @@
     }
     const GANZHI_PART = '(?:[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])';
     const SP = '[ \\t\\u3000]*';
-    const RANGE_TAIL = '(?=[，,\\n\\r]|$)';
+    // 「年」的另一种写法：唐玄宗天寶三年（744）改「年」為「載」，到肅宗乾元元年（758）才改回「年」，
+    // 所以「天寶三載」「貞觀十載」这类写法在古籍里常见，简繁两种都要认。
+    // ⚠️ 只用在「数年份」的位置 —— 年号+数字+年、干支+年、以及省略年号的裸纪年。
+    //    「年間」「年表」「元年」这些不能换，所以**没有**全局替换，各处显式引用这个片段。
+    //    消费方：content-scanner.js / canvas-adapter.js 的 BARE_GZ / BARE_YEAR / BARE_YEAR_HEAD，
+    //            content-annotation.js 抽年数，content-correction.js 的纪年尾巴，
+    //            era-search.js / sidepanel.js 的查询解析。
+    const YEAR_MARK = '(?:年|載|载)';
+    // 「年号 + 中/初/末」（不带「年」字）这里**不加任何边界约束** —— 约束放在调用方做。
+    //
+    // 为什么不能在正则里做：要看的是「整段高亮起点」前面是不是标点，而高亮起点可能比年号还靠左
+    // —— 紧挨在年号前面的朝代 / 帝号前缀也算高亮的一部分：「。周广顺末」的高亮起点是「周」，
+    // 正则里根本看不到「周」，判不了。只能由调用方算完 hlIndex（= 年号起点 − whoPrefixLength）
+    // 之后再用各自的 isBoundary() 过滤。
+    //
+    // 判定规则：hlIndex 前面必须是标点 / 空白 / 段首。原来的规则是反过来的（要求「中/初/末」
+    // 后面是标点或行尾），会漏掉古籍里不点句读的写法 ——「太和中詔中書監」的「太和中」后面
+    // 紧跟「詔」，一直标不出来。为什么不看后面：`中書監`「中書令」这类词里也有「中」，
+    // 光看后面区分不开；而前面是标点说明这里是新分句的起头，「年号+中」只可能是范围写法。
+    //
+    // ⚠️ 两个调用方必须都过滤（少一处那条路径就会误标）：
+    //      content-scanner.js 的 applyContextMatches（DOM）
+    //      canvas-adapter.js 的 findMatches（识典古籍 canvas）
+    //    以后新增 buildRegex({ range: true }) 的消费者，记得也补这一步。
     function buildRegex(opts) {
         const standalone = !!(opts && opts.standalone);
         const parts = [
-            '(?<eraG>' + NAME_PART + ')' + SP + '(?<gz>' + GANZHI_PART + ')' + SP + '年',
-            '(?<era>' + NAME_PART + ')' + SP + '(?<num>' + NUM_PART + ')' + SP + '年',
+            '(?<eraG>' + NAME_PART + ')' + SP + '(?<gz>' + GANZHI_PART + ')' + SP + YEAR_MARK,
+            '(?<era>' + NAME_PART + ')' + SP + '(?<num>' + NUM_PART + ')' + SP + YEAR_MARK,
         ];
         // 改元 + 年号
         parts.push('(?<=改元)' + SP + '(?<eraC>' + NAME_PART + ')');
         if (opts && opts.range) {
-            parts.push('(?<eraR>' + NAME_PART + ')' + SP + '年(?:间|間|中|初|末)', '(?<eraM>' + NAME_PART + ')' + SP + '(?:中|初|末)' + RANGE_TAIL);
+            parts.push('(?<eraR>' + NAME_PART + ')' + SP + '年(?:间|間|中|初|末)', '(?<eraM>' + NAME_PART + ')' + SP + '(?:中|初|末)');
         }
         if (standalone)
             parts.push('(?<eraB>' + NAME_PART + ')');
@@ -533,6 +556,7 @@
         CN_YEAR_PART: CN_YEAR_PART,
         ARABIC_YEAR_PART: ARABIC_YEAR_PART,
         YEAR_NUM_PART: YEAR_NUM_PART,
+        YEAR_MARK: YEAR_MARK,
         ganzhiOf: ganzhiOf,
         ganzhiOffsetIn: ganzhiOffsetIn,
         DYNASTY_ALIAS: DYNASTY_ALIAS,

@@ -20,18 +20,117 @@
         const o = v % 10;
         return D1[t] + "十" + (o ? D1[o] : "");
     }
-    // 纪年的第 1 年一律写「元年」，绝不写「一年」。
+    // yearLabel：第 1 年返回特例字符（不是「一」），其余走 cnNum 转中文数。
     function yearLabel(n) {
         return Number(n) === 1 ? '元' : cnNum(n);
     }
     const GANZHI_PART = '[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]';
-    // 年号后面紧跟着纪年的样子：「…元年」「…二年」「…六十一年」「…甲子年」等。
-    const CHRONO_AFTER = new RegExp('^\\s*(?:(?:' + D.YEAR_NUM_PART + ')\\s*年?|' + GANZHI_PART + '\\s*年?|年[间間]|(?:中|初|末)(?=$|[，,、。；;：:\\s]))');
+    // 年份标记认「年」也认「載 / 载」（见 eras.js 的 YEAR_MARK）。
+    const YEAR_MARK = D.YEAR_MARK;
+
+    // ---- 朝代 / 帝号 / 年号词表 ----
+    // 侧边栏输入按「朝代 → 帝号 → 年号」识别，但名称必须整段匹配，不能用包含关系猜角色。
+    // 朝代同时接受年号表里的本名、DYNASTY_ALIAS 简称，以及常见的「X朝 / X代」写法。
+    let LEXICON = null;
+    function lexicon() {
+        if (LEXICON)
+            return LEXICON;
+        const dyn = Object.create(null);
+        const emp = Object.create(null);
+        const era = Object.create(null);
+        const actualDyn = Object.create(null);
+        const addDyn = function (name, value, overwrite) {
+            const key = EraSearch.fold(name);
+            if (!key)
+                return;
+            if (overwrite || !Object.prototype.hasOwnProperty.call(dyn, key))
+                dyn[key] = value;
+        };
+        for (const e of (D.ERAS || [])) {
+            if (e.dynasty) {
+                const key = EraSearch.fold(e.dynasty);
+                actualDyn[key] = e.dynasty;
+                addDyn(e.dynasty, e.dynasty, true);
+            }
+            if (e.emperor)
+                emp[EraSearch.fold(e.emperor)] = 1;
+            if (e.name)
+                era[EraSearch.fold(e.name)] = 1;
+        }
+        const aliases = D.DYNASTY_ALIAS || {};
+        for (const name of Object.keys(aliases)) {
+            const key = EraSearch.fold(name);
+            // 年号表中真实存在的朝代名优先；仅把非本名作为简称处理。
+            if (!Object.prototype.hasOwnProperty.call(actualDyn, key))
+                addDyn(name, String(aliases[name] || name), false);
+        }
+        for (const e of (D.ERAS || [])) {
+            if (!e.dynasty)
+                continue;
+            const short = EraSearch.shortDynasty(e.dynasty);
+            addDyn(short, short, false);
+        }
+        // 为词表中的朝代名和简称生成「朝 / 代」后缀形式，值仍保留为用于筛选的规范朝代名。
+        const dynastyTokens = Object.keys(dyn).map(function (key) {
+            return { token: key, value: dyn[key] };
+        });
+        for (const item of dynastyTokens) {
+            addDyn(item.token + '朝', item.value, false);
+            addDyn(item.token + '代', item.value, false);
+        }
+        LEXICON = { dyn: dyn, emp: emp, era: era };
+        return LEXICON;
+    }
+    function dynWordValue(s) {
+        const dict = lexicon().dyn;
+        const key = EraSearch.fold(s);
+        return Object.prototype.hasOwnProperty.call(dict, key) ? dict[key] : '';
+    }
+    function isDynWord(s) { return !!dynWordValue(s); }
+    function isEmpWord(s) { return !!lexicon().emp[EraSearch.fold(s)]; }
+    function isEraWord(s) { return !!lexicon().era[EraSearch.fold(s)]; }
+
+    // 整段切分，不做子串猜测。角色可省略，但顺序固定为朝代 → 帝号 → 年号。
+    // 先尝试前面的角色，且每一格优先尝试较长的词，保证「元世祖至元」能切成三格。
+    function segmentWho(text, preferEraIfWhole) {
+        const s = String(text || '');
+        if (!s)
+            return null;
+        // 后面已经有纪年 / 干支时，前面的完整名称首先按年号理解。
+        // 例如「元王」既是帝号也是年号：「元王元年」应查年号的元年，而不是帝号列表。
+        if (preferEraIfWhole && isEraWord(s))
+            return { has: true, dynasty: '', emperor: '', era: s };
+        const KINDS = [
+            { key: 'dynasty', test: isDynWord },
+            { key: 'emperor', test: isEmpWord },
+            { key: 'era', test: isEraWord }
+        ];
+        function walk(rest, k, acc) {
+            if (!rest)
+                return acc.has ? acc : null;
+            if (k >= KINDS.length)
+                return null;
+            const kind = KINDS[k];
+            for (let len = rest.length; len >= 1; len--) {
+                const head = rest.slice(0, len);
+                if (!kind.test(head))
+                    continue;
+                const next = Object.assign({}, acc, { has: true });
+                next[kind.key] = kind.key === 'dynasty' ? dynWordValue(head) : head;
+                const got = walk(rest.slice(len), k + 1, next);
+                if (got)
+                    return got;
+            }
+            return walk(rest, k + 1, acc);
+        }
+        return walk(s, 0, { has: false });
+    }
+
     function parseQuery(q) {
         const raw = String(q || '').trim();
         if (!raw)
             return null;
-        // 纯公元年：333 / 333年 / 公元333年（也认「公元前140年」「前140年」）
+        // 纯公元年：333 / 333年 / BC104 / 前104。
         const bc = raw.match(/^(?:公元前|前|-|BC|bc)\s*(\d{1,4})\s*年?$/);
         if (bc) {
             const n = Number(bc[1]);
@@ -44,75 +143,87 @@
             if (Number.isFinite(n) && n >= 1)
                 return { gregorian: n, era: '', year: null, who: '' };
         }
-        // 先找年号（从长到短），再把剩下的部分当「纪年 + 帝号 / 朝代」。
-        // 顺序不能反过来：年号本身以「元」结尾时（建元 / 開元 / 至元 / 永元 … 表里有 35 个），
-        // 先摘纪年会把年号末尾的「元」一起摘掉 —— 「建元元年」就只剩「建」了。
-        //
-        // 但帝号在表里也可能是一条年号（西漢·高祖·高祖、商朝那一串王名），
-        // 所以还要优先取「后面紧跟着纪年」的那个匹配：
-        // 「唐高祖武德元年」要认出「武德」，不能认出「高祖」。
-        let era = '';
-        let eraAt = -1;
-        let loose = '';
-        let looseAt = -1;
-        for (let len = 4; len >= 2 && !era; len--) {
-            for (let i = 0; i + len <= raw.length; i++) {
-                const s = raw.slice(i, i + len);
-                if (!D.lookupEra(s).length)
-                    continue;
-                if (CHRONO_AFTER.test(raw.slice(i + len))) {
-                    era = s;
-                    eraAt = i;
-                    break;
-                }
-                if (!loose) {
-                    loose = s;
-                    looseAt = i;
+
+        // 统一去掉分隔符后解析。年份与干支必须从输入末尾识别，不能先把「元」等字当作名称吞掉。
+        const clean = raw.replace(/[\s·、,，]/g, '');
+        let body = clean;
+        let year = null;
+        let ganzhi = '';
+        let seg = null;
+        const yearGuard = '(?<![一二三四五六七八九十百千万廿卅卌0-9０-９])';
+        const yearPattern = new RegExp(yearGuard + '(' + D.YEAR_NUM_PART + ')' + YEAR_MARK + '$');
+        const ganzhiMarkedPattern = new RegExp('(' + GANZHI_PART + ')' + YEAR_MARK + '$');
+        const ganzhiBarePattern = new RegExp('(' + GANZHI_PART + ')$');
+
+        // 明写「元年 / 十二年 / 12載」时，纪年标记优先；「元年」中的元是第一年，不是元朝。
+        let tail = body.match(yearPattern);
+        if (tail) {
+            year = tail[1] === '元' ? 1 : D.cnToNumber(tail[1]);
+            body = body.slice(0, tail.index);
+        } else {
+            // 没写纪年标记时，先保留整串确实存在的名称：单独输入「元」应识别为朝代，
+            // 「元王」等重名词也不应被拆成一个虚构的「元年」。
+            seg = segmentWho(clean);
+            if (seg)
+                return makeParsedIdentity(seg, null, '');
+
+            // 干支可带「年」，也可省略；例如「康熙甲子年 / 康熙甲子」。
+            tail = body.match(ganzhiMarkedPattern) || body.match(ganzhiBarePattern);
+            if (tail) {
+                ganzhi = tail[1];
+                body = body.slice(0, tail.index);
+            }
+            // 「雍正十二年甲子」这类写法中，干支后面还可能带一个纪年。
+            const markedYear = body.match(yearPattern);
+            if (markedYear) {
+                year = markedYear[1] === '元' ? 1 : D.cnToNumber(markedYear[1]);
+                body = body.slice(0, markedYear.index);
+            } else {
+                // 允许省略「年」：只有当前缀本身能完整识别为名称时，末尾的「元 / 十二 / 12」才算纪年。
+                // 因而「元」仍会按朝代识别，而「至元元」才会识别成至元元年。
+                const bareYear = body.match(new RegExp(yearGuard + '(' + D.YEAR_NUM_PART + ')$'));
+                if (bareYear) {
+                    const prefix = body.slice(0, bareYear.index);
+                    const prefixSeg = segmentWho(prefix, true);
+                    if (prefixSeg && prefixSeg.era) {
+                        year = bareYear[1] === '元' ? 1 : D.cnToNumber(bareYear[1]);
+                        body = prefix;
+                    } else if (prefixSeg) {
+                        // 前缀只识别成朝代 / 帝号时，不能把末尾「元」当元年；
+                        // 也不能再把整串交给模糊帝号搜索（「唐元」会误中「南唐·元宗」）。
+                        return { era: '', year: null, ganzhi: '', who: clean,
+                            dynasty: '', emperor: '', invalidQuery: true };
+                    }
                 }
             }
         }
-        if (!era && loose) {
-            era = loose;
-            eraAt = looseAt;
+
+        // 纪年或干支剥离后，再严格切分前面的朝代、帝号、年号。
+        seg = segmentWho(body, year !== null || !!ganzhi);
+        // 纪年 / 干支必须依附于明确的年号。否则「唐元」「唐元年」会被
+        // 截成朝代「唐」，「元元」会被截成朝代「元」，进而误出看似正确的结果。
+        // 遇到这种输入时把整串留给未命中提示，不降级成朝代或帝号查询。
+        if ((year !== null || ganzhi) && (!seg || !seg.era)) {
+            if (seg && (seg.dynasty || seg.emperor)) {
+                return { era: '', year: null, ganzhi: '', who: clean,
+                    dynasty: '', emperor: '', invalidQuery: true };
+            }
+            return makeParsedIdentity(null, null, '', clean);
         }
-        let who = eraAt >= 0 ? raw.slice(0, eraAt) + raw.slice(eraAt + era.length) : raw;
-        // 「甲子年」这类写法单独解析：年号明确时按该年号的有效范围计算公元年。
-        let ganzhi = '';
-        const gm = who.match(new RegExp('(' + GANZHI_PART + ')\\s*年?'));
-        if (gm) {
-            ganzhi = gm[1];
-            who = who.slice(0, gm.index) + who.slice(gm.index + gm[0].length);
-        }
-        // 「元」= 第 1 年 —— 首个年头一律写「元年」，不写「一年」。
-        let year = null;
-        const ym = who.match(new RegExp('(?<![二三四五六七八九十0-9０-９])(' + D.YEAR_NUM_PART + ')\\s*年?'));
-        if (ym) {
-            const n = ym[1] === '元' ? 1 : D.cnToNumber(ym[1]);
-            if (Number.isFinite(n) && n >= 1)
-                year = n;
-            who = who.slice(0, ym.index) + who.slice(ym.index + ym[0].length);
-        }
-        who = who.replace(/(?:年间|中|初|末)$/, '');
-        who = who.replace(/[\s·、,，]/g, '');
-        return { era: era, year: year, ganzhi: ganzhi, who: who };
+        return makeParsedIdentity(seg, year, ganzhi, body);
     }
-    // 表里存的是正体（北漢 / 後漢），用户可能输入简体（北汉 / 后汉）—— 必须过 fold() 再比，
-    // 否则「北汉乾祐二年」匹配不上任何一条，会退回「请选朝代」的建议框。
-    // 另外要挡住空串：'北汉'.indexOf('') 是 0，不判空的话「朝代为空」的条目会全部命中。
-    function whoMatch(row, who) {
-        if (!who)
-            return true;
-        const w = EraSearch.fold(who);
-        if (!w)
-            return true;
-        const d = EraSearch.fold(row.dynasty || '');
-        const e = EraSearch.fold(row.emperor || '');
-        return (!!d && d.indexOf(w) >= 0) || (!!d && w.indexOf(d) >= 0) ||
-            (!!e && e.indexOf(w) >= 0) || (!!e && w.indexOf(e) >= 0);
+    function makeParsedIdentity(seg, year, ganzhi, fallbackBody) {
+        const era = seg && seg.era ? seg.era : '';
+        const dynasty = seg && seg.dynasty ? seg.dynasty : '';
+        const emperor = seg && seg.emperor ? seg.emperor : '';
+        const body = String(fallbackBody == null ? '' : fallbackBody);
+        // 完整切分成功时使用规范化后的朝代 / 帝号；否则把剩余输入留给现有的候选提示逻辑。
+        const who = seg ? (dynasty + emperor) : body;
+        return { era: era, year: year, ganzhi: ganzhi, who: who, dynasty: dynasty, emperor: emperor };
     }
     // 这条年号到底有没有「第 n 年」——按表里记的起止年判断。
-    // 用 eraYear() 而不是 start + n - 1，一是跨公元前后不差一年，二是表里第 6 列
-    // 那种「不从元年开始计数」的条目（天會：968 是十二年）能算对。
+    // 用 D.eraYear() 而不是 start + n - 1：一是跨前后分界不差一年，
+    // 二是表里第 6 列那种「start 不是第 1 年」的条目能算对（offset 语义见 `eras.js` 的 `eraYear`）。
     // 起止年任一端不可考（表里为 null）或数据颠倒（end < start）时判断不了，
     // 一律放行，不把本来收录了的年号误判成不存在；这类条目公历年显示「未知」。
     function hasNthYear(row, n) {
@@ -123,7 +234,7 @@
             return true;
         return D.eraYear(start, n, row.offset) <= end;
     }
-    // 覆盖某个公元年的全部年号（一个年份可能同时有好几个政权在用的年号）。
+    // 覆盖某个年份的全部年号（一个年份可能同时有好几个政权在用的年号）。
     // 返回 [{ row, n }]，n = 该年是这条年号的第几年。
     function erasCoveringYear(year) {
         const out = [];
@@ -138,7 +249,7 @@
             if (seen[key])
                 continue;
             seen[key] = 1;
-            // 这一年的纪年数 = 离 start 的偏移 + offset（表里第 6 列那种不从元年开始计数的条目）。
+            // 这一年的纪年数 = 离 start 的偏移 + offset（offset 语义见 `eras.js` 的 `eraYear`）。
             const off = Number.isFinite(e.offset) && e.offset >= 1 ? e.offset : 1;
             out.push({ row: e, n: year - e.start + off });
         }
@@ -148,10 +259,62 @@
         });
         return out;
     }
+    // 这个输入能匹配到几个「朝代」（朝代名里包含输入，折简繁后比）。表序去重。
+    // 「西漢」→ 只有 1 个；「汉」→ 西漢/玄漢/漢其他/東漢/蜀漢… 11 个；「唐」→ 唐其他/唐/後唐/南唐 4 个。
+    // 用来决定「要不要弹朝代选择框」—— 只有一个朝代就直接出结果，多个才弹（用户 2026-10-12 要求）。
+    function matchingDynasties(text) {
+        const raw = String(text || '').trim().replace(/[朝]$/, '');
+        if (!raw)
+            return [];
+        const q = EraSearch.fold(raw);
+        const out = [];
+        const seen = Object.create(null);
+        for (const e of (D.ERAS || [])) {
+            const dy = e.dynasty;
+            if (!dy || seen[dy])
+                continue;
+            if (EraSearch.fold(dy).indexOf(q) < 0)
+                continue;
+            seen[dy] = 1;
+            out.push(dy);
+        }
+        return out;
+    }
+    // 多个朝代时，面板默认显示哪个：「XX其他」是兜底归类（唐其他 = 沈法興/李重福…），不作默认。
+    // 所以取表序里第一个**不带「其他」**的；全是兜底归类时才退回第一个。
+    function defaultDynasty(text) {
+        const dyns = matchingDynasties(text);
+        if (!dyns.length)
+            return '';
+        return dyns.filter(function (dy) { return dy.indexOf('其他') < 0; })[0] || dyns[0];
+    }
+    // 「要不要弹朝代选择框」的判据：匹配到**多于一个**朝代。
+    // ⚠️ 不算「XX其他」这种兜底归类 —— 否则「清」会因为「清其他」被判成多朝代，
+    // 弹框问「清 / 清其他」，而用户只是想看清朝。
+    function multiDynasty(text) {
+        return matchingDynasties(text).filter(function (dy) {
+            return dy.indexOf('其他') < 0;
+        }).length > 1;
+    }
+    // 整串输入（去掉末尾的「朝」）是否**正好**是一个朝代名。
+    // 用「完全相等」而不是「包含」—— 否则「武」会因为「武周」被判成朝代查询，
+    // 把 5.6 的帝号建议框抢掉（「武」要的是「商 · 武丁」那种帝号建议）。
+    // 判据直接扫年号表，不走 `dynasties()` 的 12 条上限，免得「漢」这种被截掉。
+    function isDynastyQuery(text) {
+        const raw = String(text || '').trim().replace(/[朝]$/, '');
+        if (!raw)
+            return false;
+        const q = EraSearch.fold(raw);
+        return (D.ERAS || []).some(function (e) {
+            return !!e.dynasty && EraSearch.fold(e.dynasty) === q;
+        });
+    }
     function search(q) {
         const p = parseQuery(q);
         if (!p)
             return { kind: 'idle' };
+        if (p.invalidQuery)
+            return { kind: 'no-era', strictInvalid: true };
         if (p.gregorian) {
             const rows = erasCoveringYear(p.gregorian);
             return rows.length
@@ -168,11 +331,26 @@
                         return { kind: "emperor", who: pick, rows: rows };
                 }
                 const all = EraSearch.emperors(who, 30);
+                // 整串就是某个**朝代名**（「西漢」「唐」「秦」）→ 面板列该朝代的帝号，每行点开看年号。
+                //   只匹配到一个朝代（「西漢」）→ 直接出结果，不弹框。
+                //   匹配到多个朝代（「唐」= 唐其他/唐/後唐/南唐）→ 面板默认显示第一个朝代的帝号，
+                //   同时弹「朝代选择框」让用户挑（`multiDyn`，见 input 处理）。
+                // 帝号查询（「武帝」「太宗」）不走这条路，保持 5.6 原样。
+                if (all.length > 1 && isDynastyQuery(q)) {
+                    const dyns = matchingDynasties(q);
+                    const first = defaultDynasty(q);
+                    const mine = first ? all.filter(function (x) { return x.dynasty === first; }) : [];
+                    return {
+                        kind: "who-list",
+                        list: mine.length ? mine : all,
+                        multiDyn: multiDynasty(q),
+                        dyns: dyns
+                    };
+                }
                 if (all.length) {
-                    const first = all[0];
-                    const rows = EraSearch.erasOfEmperor(first.dynasty, first.emperor);
+                    const rows = EraSearch.erasOfEmperor(all[0].dynasty, all[0].emperor);
                     if (rows.length) {
-                        return { kind: "emperor", who: first, rows: rows, list: all };
+                        return { kind: "emperor", who: all[0], rows: rows, list: all };
                     }
                 }
                 return { kind: "no-era" };
@@ -182,8 +360,25 @@
         let rows = D.lookupEra(p.era);
         if (!rows.length)
             return { kind: 'none', era: p.era };
-        if (p.who) {
-            const hit = rows.filter((r) => whoMatch(r, p.who));
+        // 朝代 / 帝号是 parseQuery **严格切分**出来的（就是表里那一条的名字），所以这里直接
+        // 用折简繁后的**完全相等**去筛。按「包含」挑会挑错：朝代「明」会匹配到「前燕·文明帝」
+        //（'文明帝'.indexOf('明') ≥ 0）。
+        // 朝代额外认「简称」（`shortDynasty`：西漢/東漢/蜀漢 → 漢，北宋/南宋 → 宋）：
+        // 用户打「汉武帝太初」，朝代写的是「汉」，而表里那条是「西漢」。
+        if (p.dynasty || p.emperor) {
+            const fd = p.dynasty ? EraSearch.fold(p.dynasty) : '';
+            const fe = p.emperor ? EraSearch.fold(p.emperor) : '';
+            const hit = rows.filter(function (r) {
+                if (fd) {
+                    const dy = EraSearch.fold(r.dynasty || '');
+                    const short = EraSearch.fold(EraSearch.shortDynasty(r.dynasty || ''));
+                    if (dy !== fd && short !== fd)
+                        return false;
+                }
+                if (fe && EraSearch.fold(r.emperor || '') !== fe)
+                    return false;
+                return true;
+            });
             if (hit.length)
                 rows = hit;
             else
@@ -213,13 +408,56 @@
         // 但前秦用了 9 年、西秦 13 年，它们的太初五年要照常留下。
         if (Number.isFinite(p.year) && p.year >= 1) {
             const inRange = rows.filter((r) => hasNthYear(r, p.year));
-            // rows 留给报错文案列出各条年号的起止年；同时它让 hasResults() 认为
-            // 「已经认出来了」，于是不会再弹出建议下拉（「太初五年」不该再提示别的年号）。
+            // rows 留给报错文案列出各条年号的起止年；同时它让结果面板认为
+            // 「已经认出来了」（rows 非空），于是不会再弹出建议下拉（「太初五年」不该再提示别的年号）。
             if (!inRange.length)
                 return { kind: 'year-out', era: p.era, year: p.year, who: p.who, rows: rows };
             rows = inRange;
         }
         return { kind: 'ok', era: p.era, year: p.year, rows: rows };
+    }
+    // sp-out 的未完成输入预览只按「年号名称」匹配，不把朝代 / 帝号命中当作结果。
+    // 搜索建议框仍使用原来的 search() 与 showSug()，所以提示框规则不受影响。
+    function partialEraRows(q) {
+        const fragment = EraSearch.fragmentOf(q);
+        if (!fragment)
+            return [];
+        const folded = EraSearch.fold(fragment);
+        if (!folded)
+            return [];
+        // 沿用提示框已有的末尾片段识别规则，但结果只允许由年号名称命中。
+        const rows = (D.ERAS || []).filter(function (row) {
+            return row && row.name && EraSearch.fold(row.name).indexOf(folded) >= 0;
+        });
+        if (!rows.length)
+            return [];
+        // 年号名以输入片段开头的优先，其余包含匹配随后；同等相关时保留年号表顺序。
+        rows.sort(function (a, b) {
+            const aPrefix = EraSearch.fold(a.name).indexOf(folded) === 0 ? 0 : 1;
+            const bPrefix = EraSearch.fold(b.name).indexOf(folded) === 0 ? 0 : 1;
+            return aPrefix - bPrefix;
+        });
+        return rows.slice(0, 12);
+    }
+    function searchOutput(q) {
+        const result = search(q);
+        const raw = String(q || '').trim();
+        if (!raw || (result && result.strictInvalid))
+            return result;
+        const parsed = parseQuery(q);
+        // 明确的年号、纪年、公元年查询照旧；只有尚未解析成具体年号 / 年份的输入，
+        // 才把 sp-out 切换为「年号名称」预览。
+        // 朝代 / 帝号的完整名称查询必须保留原结果（例如搜「唐」显示唐朝帝号列表），
+        // 不能被下方「未完成年号片段」预览覆盖。
+        if (!parsed || parsed.gregorian || parsed.era || parsed.year !== null || parsed.ganzhi ||
+            parsed.dynasty || parsed.emperor)
+            return result;
+        const rows = partialEraRows(q);
+        if (rows.length === 1)
+            return { kind: 'ok', era: '', year: null, rows: rows, autoEraPreview: true };
+        if (rows.length > 1)
+            return { kind: 'preview-multiple', autoEraPreview: true };
+        return { kind: 'no-era', autoEraPreview: true };
     }
     function el(tag, cls, text) {
         const n = document.createElement(tag);
@@ -237,18 +475,116 @@
     function fmtRange(r) {
         if (yearsUnknown(r))
             return '未知';
-        // 前 841 年（共和元年）之前的年份各加「约」
+        // 前 841 年（共和纪年起点）之前的年份各加「约」
         const a = D.formatYearApprox(r.start);
         const b = D.formatYearApprox(r.end);
         if (b === a)
             return a + '年';
         return a + '-' + b + '年';
     }
-    // 表里第 6 列：这个年号在 start 那一年已经是第几年。缺省 1（start 就是元年）时返回空串。
-    // 显示成「起12年」放在公历年下面，免得把「968-973年」误读成 968 就是元年。
+    // 表里第 6 列：这个年号在 start 那一年已经是第几年。缺省 1（start 就是第 1 年）时返回空串。
+    // 显示成「起12年」放在公历年下面，免得把「968-973年」误读成 968 就是第 1 年。
     function epochLabel(row) {
         const off = Number(row && row.offset);
         return Number.isFinite(off) && off > 1 ? '起' + Math.floor(off) + '年' : '';
+    }
+    // 「这个年号下每一年」：从第 1 年开始逐个数，直到超过表里的 end。
+    // 表里第 6 列 offset = 「start 那一年已经是第几年」（天會：968 是十二年 → 第 1 年 = 957），
+    // 所以最大年数 = offset + (end - start)。start / end 不可知（夏商那些只有王名的 44 条）→
+    // 返回 null，那一行不给展开。全表最长的年号是 64 年（齊·前莊公），逐条枚举很便宜。
+    function yearListOf(row) {
+        if (yearsUnknown(row))
+            return null;
+        const off = Number.isFinite(row.offset) && row.offset >= 1 ? Math.floor(row.offset) : 1;
+        const max = off + (row.end - row.start);
+        if (!Number.isFinite(max) || max < 1)
+            return null;
+        const out = [];
+        for (let n = 1; n <= max; n++) {
+            const year = D.eraYear(row.start, n, off);
+            if (!Number.isFinite(year) || year > row.end)
+                break;
+            out.push({ n: n, year: year, gz: D.ganzhiOf(year) });
+        }
+        return out.length ? out : null;
+    }
+    // 点一下年号行 → 在它下面插入「该年号每一年」：左边纪年，右边「年份 + 干支」（两者隔 1em）。
+    // 再点一下收起。展开块用 insertAdjacentElement 插在行后面，所以同时展开好几行也不会串位。
+    function makeExpandable(rowEl, row, eraName) {
+        const list = yearListOf(row);
+        if (!list)
+            return;
+        rowEl.classList.add('sp-row-expand');
+        rowEl.setAttribute('role', 'button');
+        rowEl.setAttribute('aria-expanded', 'false');
+        let box = null;
+        rowEl.addEventListener('click', function () {
+            if (rowEl.getAttribute('aria-expanded') === 'true') {
+                rowEl.setAttribute('aria-expanded', 'false');
+                if (box) {
+                    box.remove();
+                    box = null;
+                }
+                return;
+            }
+            rowEl.setAttribute('aria-expanded', 'true');
+            if (box)
+                return;
+            box = el('div', 'sp-yearlist');
+            for (const it of list) {
+                const line = el('div', 'sp-yearlist-item');
+                line.appendChild(el('span', 'sp-yearlist-era', eraName + yearLabel(it.n) + '年'));
+                const right = el('span', 'sp-yearlist-val');
+                right.appendChild(el('span', 'sp-yearlist-greg', D.formatYearApprox(it.year)));
+                right.appendChild(el('span', 'sp-yearlist-gz', it.gz));
+                line.appendChild(right);
+                box.appendChild(line);
+            }
+            rowEl.insertAdjacentElement('afterend', box);
+        });
+    }
+    // 一条「年号」行：左边年号，右边起止年（+「起 N 年」）。行本身可以再点开看这个年号的每一年。
+    function eraRow(r) {
+        const row = el('div', 'sp-row');
+        const left = el('div', 'sp-row-left');
+        left.appendChild(el('span', 'sp-era', r.name));
+        row.appendChild(left);
+        const right = el('div', 'sp-year');
+        right.appendChild(document.createTextNode(fmtRange(r)));
+        const epoch = epochLabel(r);
+        if (epoch)
+            right.appendChild(el('span', 'sp-epoch', epoch));
+        row.appendChild(right);
+        makeExpandable(row, r, r.name);
+        return row;
+    }
+    // 帝号行：点开 = 列出该帝号下的**所有年号**（那些年号行本身还能再点开看每年）。
+    // 搜朝代（「西漢」）或重名帝号（「武帝」）时，结果面板列的就是这些行。
+    function makeEmperorExpandable(rowEl, it) {
+        const eras = EraSearch.erasOfEmperor(it.dynasty, it.emperor);
+        if (!eras.length)
+            return;
+        rowEl.classList.add('sp-row-expand');
+        rowEl.setAttribute('role', 'button');
+        rowEl.setAttribute('aria-expanded', 'false');
+        let box = null;
+        rowEl.addEventListener('click', function () {
+            if (rowEl.getAttribute('aria-expanded') === 'true') {
+                rowEl.setAttribute('aria-expanded', 'false');
+                if (box) {
+                    box.remove();
+                    box = null;
+                }
+                return;
+            }
+            rowEl.setAttribute('aria-expanded', 'true');
+            if (box)
+                return;
+            box = el('div', 'sp-eralist');
+            for (const r of eras)
+                box.appendChild(eraRow(r));
+            rowEl.insertAdjacentElement('afterend', box);
+        });
     }
     function render(res) {
         // 放在最前面：下面大多数分支都会提前 return，挂末尾会有分支漏掉。
@@ -275,7 +611,7 @@
                 ul.appendChild(li);
             }
 
-            addItem('公元年', '104、BC104、bc104、前104、公元前104');
+            addItem('公元年', '104、104年、BC104、bc104、前104、公元前104');
             addItem('年号', '太初、太初元年、武帝太初元年、汉武帝太初元年、康熙甲子年');
             addItem('帝号', '武帝、汉武帝');
             addItem('朝代', '汉、西汉');
@@ -284,24 +620,37 @@
             outEl.appendChild(hint);
             return;
         }
+        if (res.kind === 'preview-multiple') {
+            // 未完成输入匹配到多个年号时不自动展示候选；让用户继续输入或通过提示框选择。
+            return;
+        }
         if (res.kind === 'no-era') {
-            outEl.appendChild(el('div', 'sp-empty', '未查询到该年号，请重新输入。'));
+            outEl.appendChild(el('div', 'sp-empty', res.autoEraPreview
+                ? '没有匹配的年号名称。'
+                : '未查询到该年号，请重新输入。'));
             return;
         }
         if (res.kind === "who-list") {
+            // 搜朝代 / 重名帝号：列出所有匹配的帝号，点开看该帝号下的年号。
+            // 同一朝代时行里只写帝号（朝代在输入框里已经写了）；跨朝代（「武帝」）才带上朝代。
+            const sameDyn = res.list.length > 0 && res.list.every(function (x) {
+                return x.dynasty === res.list[0].dynasty;
+            });
             for (const it of res.list) {
-                const row = el("div", "sp-row sp-row-pick");
+                const row = el("div", "sp-row");
                 row.setAttribute("data-dynasty", it.dynasty);
                 row.setAttribute("data-emperor", it.emperor);
                 const left = el("div", "sp-row-left");
-                left.appendChild(el("span", "sp-era", it.dynasty + "·" + it.emperor));
+                left.appendChild(el("span", "sp-era",
+                    sameDyn ? it.emperor : it.dynasty + " · " + it.emperor));
                 row.appendChild(left);
-                row.addEventListener("click", function () {
-                    qEl.value = it.dynasty + it.emperor;
-                    run();
-                    qEl.focus();
-                });
+                const eras = EraSearch.erasOfEmperor(it.dynasty, it.emperor);
+                const right = el("div", "sp-year");
+                if (eras.length)
+                    right.appendChild(el("span", "sp-era-count", eras.length + " 个年号"));
+                row.appendChild(right);
                 outEl.appendChild(row);
+                makeEmperorExpandable(row, it);
             }
             return;
         }
@@ -333,7 +682,7 @@
             return;
         }
         if (res.kind === 'year') {
-            // 第一行之前先给一条提示：公元年 - 干支
+            // 第一行之前先给一条提示：年份 - 干支
             const head = el('div', 'sp-year-head');
             head.appendChild(el('b', 'sp-year-num', D.formatYear(res.year) + '年'));
             head.appendChild(el('span', 'sp-year-sep', '-'));
@@ -343,36 +692,25 @@
                 const r = item.row;
                 const row = el('div', 'sp-row');
                 // 一行读完：朝代 · 帝号 · 年号+纪年（如「唐 · 太宗 · 貞觀五年」）。
-                // 查的就是这个公元年，表头已经写了，行里不再重复年份；
+                // 查的就是这个年份，表头已经写了，行里不再重复年份；
                 // 该年号的起止年放到 title 里，需要时悬停看。
                 row.title = fmtRange(r);
                 // 朝代只去掉末尾的「朝」（唐朝→唐）；不用 EraSearch.shortDynasty ——
                 // 那个是给匹配用的简称（東晉→晉、前涼→涼），显示太短。
                 const dynasty = String(r.dynasty || '').replace(/[朝]$/, '');
-                // 第 1 年写「元年」，不写「一年」
-                const yearNum = yearLabel(item.n);
+                const yearNum = yearLabel(item.n);   // 第 1 年走特例，见 yearLabel
                 const left = el('div', 'sp-row-left');
                 left.appendChild(el('span', 'sp-era',
                     D.whoText(dynasty, r.emperor, r.name + yearNum + '年', r.name) || '（无朝代信息）'));
                 row.appendChild(left);
                 outEl.appendChild(row);
+                makeExpandable(row, r, r.name);
             }
             return;
         }
         if (res.kind === "emperor") {
-            for (const r of res.rows) {
-                const row = el("div", "sp-row");
-                const left = el("div", "sp-row-left");
-                left.appendChild(el("span", "sp-era", r.name));
-                row.appendChild(left);
-                const right = el("div", "sp-year");
-                right.appendChild(document.createTextNode(fmtRange(r)));
-                const epoch = epochLabel(r);
-                if (epoch)
-                    right.appendChild(el("span", "sp-epoch", epoch));
-                row.appendChild(right);
-                outEl.appendChild(row);
-            }
+            for (const r of res.rows)
+                outEl.appendChild(eraRow(r));
             return;
         }
         for (const r of res.rows) {
@@ -399,11 +737,14 @@
                 right.appendChild(el('span', 'sp-epoch', epoch));
             row.appendChild(right);
             outEl.appendChild(row);
+            makeExpandable(row, r, r.name);
         }
     }
     const sugEl = document.getElementById("sp-sug");
     let sugItems = [];
     let sugOn = -1;
+    // applySug() 刚被调用过 → 下一次 input 不要弹框（见 applySug 里的注释）。
+    let sugSuppress = false;
     function pickEmperor(text) {
         const raw = EraSearch.stripYearTail(text);
         if (!raw)
@@ -420,15 +761,6 @@
         const pool = withDyn.length ? withDyn : list;
         return pool.length === 1 ? pool[0] : null;
     }
-    function hasResults(text) {
-        try {
-            const res = search(text);
-            return !!(res && res.rows && res.rows.length > 0);
-        }
-        catch (e) {
-            return false;
-        }
-    }
     function hideSug() {
         if (sugEl) {
             sugEl.hidden = true;
@@ -438,12 +770,29 @@
         sugOn = -1;
     }
     // 把「年号候选」画进建议框：先列 search() 的结果，再补上「更长的同前缀年号」。
-    // 「建武」→「建武中元」：search() 按「包含」匹配，一般已经把它们带上了，
+    // 「天授」→「天授禮法延祚」：search() 按「包含」匹配，一般已经把它们带上了，
     // 这里补一遍主要是兜底 —— 免得同前缀的短年号条数把 12 条上限占满、更长的那个被截掉。
+    //
+    // 每一项带一个 `value` = 点下去要写进输入框的东西。
+    // **什么时候要把朝代拼进去**（两个条件满足其一，且这一项有朝代）：
+    //   · 这一项的名字**就是用户当前输入的那一段**（`name === frag`）—— 光写年号名点下去
+    //     输入框一字不变，等于没点。这一条不论该年号在表里有几条都成立，所以不能只留后面那条。
+    //   · 或者同名年号在表里有多条 —— 不拼朝代收窄不到那一条（太初有 5 个朝代）。
+    // **其余情况只写年号名**，保住「武周天授 点天授禮法延祚 → 武周天授禮法延祚」的前缀保留
+    // （README 5.5）：`applySug` 是「替换末尾片段」拼的，若写成「西夏天授禮法延祚」会拼成
+    // 「武周西夏天授禮法延祚」。
+    function pickValue(name, dynasty, frag) {
+        if (!dynasty)
+            return name;
+        const needDynasty = name === frag || D.lookupEra(name).length > 1;
+        return needDynasty ? dynasty + name : name;
+    }
     function renderEraPicks(rows, frag) {
         sugEl.textContent = "";
         const picks = rows.map(function (r) {
-            return { name: r.name, dynasty: r.dynasty, emperor: r.emperor };
+            const name = String(r.name || '');
+            const dynasty = String(r.dynasty || '');
+            return { name: name, dynasty: r.dynasty, emperor: r.emperor, value: pickValue(name, dynasty, frag) };
         });
         const haveName = Object.create(null);
         for (const it of picks)
@@ -454,9 +803,15 @@
                 continue;
             haveName[key] = 1;
             const row = D.lookupEra(nm)[0];
-            picks.push({ name: nm, dynasty: row ? row.dynasty : '', emperor: row ? row.emperor : '' });
+            const dynasty = row ? String(row.dynasty || '') : '';
+            picks.push({
+                name: nm,
+                dynasty: row ? row.dynasty : '',
+                emperor: row ? row.emperor : '',
+                value: pickValue(nm, dynasty, frag)
+            });
         }
-        sugItems = picks.map(function (it) { return it.name; });
+        sugItems = picks.map(function (it) { return it.value; });
         sugOn = -1;
         picks.forEach(function (it, i) {
             const item = el("div", "sp-sug-item");
@@ -467,7 +822,7 @@
                 item.appendChild(el("span", "sp-sug-meta", meta));
             item.addEventListener("mousedown", function (e) {
                 e.preventDefault();
-                applySug(picks[i].name);
+                applySug(picks[i].value);
             });
             item.setAttribute("data-i", String(i));
             sugEl.appendChild(item);
@@ -480,19 +835,23 @@
         catch (e) { }
         sugEl.hidden = false;
     }
-    // 输入的年号片段「正好落在输入末尾」时，返回它还作为前缀的更长年号（「建武」→「建武中元」）。
-    // 三个前提，缺一不可：
+    // 输入的年号片段「正好落在输入末尾」时，返回它还作为前缀的更长年号
+    // （「天授」→「天授禮法延祚」、「太平」→「太平真君」）。三个前提：
     //   1) 片段落在输入末尾 —— 后面还跟着纪年 / 干支（「建武三年」）不算：用户已经把年号定下来了，
     //      而且 applySug 是按「替换末尾片段」拼的，片段不在末尾会把纪年拼坏。
-    //   2) **输入本身就是一条年号**（`lookupEra` 命中）—— 「建武」「太平」是完整年号，该提示
-    //      「建武中元 / 太平興國」；「武」「太」「天」这种半截输入不是，得留给原来的帝号建议，
-    //      否则单字输入会把帝号弹框整支抢走（只剩年号）。
+    //   2) **按「输入词优先当年号」处理**（用户 2026-10-12 明确要求）：
+    //      输入本身是完整年号（建武 / 太平），**或者**它确实是一个更长年号的开头（天授 是 天授禮法延祚 的开头），
+    //      都算「用户在打年号」，弹年号候选框。
+    //      ⚠️ 唯一的例外：这个片段同时还能对上帝号（`emperors()` 非空）时让位给帝号建议。
+    //      全表有 308 个「不是完整年号但是年号前缀」的串，其中 221 个能对上帝号 ——
+    //      全是「武」「太」「貞」「文」「成」这种半截字。不放这个闸，「武」会从
+    //      「西漢 · 武帝…」变成一串年号（用户反馈过这个 bug）。
     //   3) 确实存在更长的同前缀年号。
     function extensionPicks(frag) {
         const cur = String(qEl.value || '');
         if (!frag || cur.slice(-frag.length) !== frag)
             return [];
-        if (!D.lookupEra(frag).length)
+        if (!D.lookupEra(frag).length && EraSearch.emperors(frag, 5).length)
             return [];
         return EraSearch.extensions(frag, 12);
     }
@@ -500,12 +859,9 @@
         if (!sugEl)
             return;
         const rawForWho = EraSearch.stripYearTail(qEl.value);
-        const dyns = EraSearch.dynasties(rawForWho, 12).filter(function (dy) {
-            const fdy = EraSearch.fold(dy);
-            const short = EraSearch.fold(EraSearch.shortDynasty(dy));
-            const fq = EraSearch.fold(rawForWho);
-            return fdy.indexOf(fq) >= 0 || short.indexOf(fq) >= 0;
-        });
+        // 朝代选择框：只在**匹配到多个朝代**时弹（「唐」→ 唐/唐其他/後唐/南唐）。
+        // 只匹配到一个（「西漢」）就不弹，直接看结果（用户 2026-10-12 要求）。
+        const dyns = matchingDynasties(rawForWho);
         if (dyns.length > 1) {
             sugEl.textContent = "";
             sugItems = [];
@@ -534,7 +890,7 @@
         const rows = EraSearch.search(frag, 12);
         const rawText = EraSearch.fold(EraSearch.stripYearTail(qEl.value));
         const specific = !!pickEmperor(qEl.value);
-        // 「建武」这类：输入本身是个**完整年号**，但它还是别的更长年号的开头（建武中元）。
+        // 「天授」这类：输入本身是个**完整年号**，但它还是别的更长年号的开头（天授禮法延祚）。
         // 这时给「年号候选」框让用户挑，排在帝号建议之前 —— 否则「太平」会先命中
         // 「太平天國」的帝号（洪秀全），弹出一串帝号反而没有年号可选。
         // 注意半截输入（「武」「太」）不会走到这里：extensionPicks 要求 lookupEra(frag) 命中。
@@ -639,6 +995,11 @@
         }
         hideSug();
         qEl.focus();
+        // 用户刚**明确点过一项**：紧接着这次 input 不要再把建议框弹回来。
+        // 少了这句，「太平」点第一条 → 输入变「吳太平」→ 末尾片段还是「太平」、仍有
+        // 「太平真君」可提示 → 框立刻又弹出来，用户看到的是「提示框没消失」。
+        // 只挡这一次；后面真的打字（新的 input 事件）照常能弹。
+        sugSuppress = true;
         qEl.dispatchEvent(new Event("input", { bubbles: true }));
     }
     function moveSug(d) {
@@ -654,7 +1015,7 @@
     }
     function renderQuery() {
         try {
-            render(search(qEl.value));
+            render(searchOutput(qEl.value));
         }
         catch (e) {
             outEl.textContent = '';
@@ -668,14 +1029,45 @@
     }
     qEl.addEventListener('input', function () {
         run();
-        const res = search(qEl.value);
-        const isWho = !!(res && res.kind === "emperor" && res.list && res.list.length > 1);
-        const onlyDyn = !hasResults(qEl.value) && EraSearch.dynasties(EraSearch.stripYearTail(qEl.value), 12).length > 1;
+        // 刚点过建议项：这次输入是 applySug() 触发的，别再弹框（结果面板照常刷新，run() 已经在上面了）。
+        if (sugSuppress) {
+            sugSuppress = false;
+            hideSug();
+            return;
+        }
+        // 判断「要不要弹帝号选择框」时**不能只看 search() 返回的 kind**。
+        // 「太宗」「太祖」「高祖」这些既是帝号、又恰好是表里某些条目的**年号名**
+        // （蒙古·太宗·太宗、遼·太祖·太祖、西漢·高祖·高祖…），parseQuery 会先把它当年号，
+        // search() 于是走年号分支，返回的 kind 不是 'emperor' —— 建议框就被下面那句 hideSug() 吞掉了。
+        // 直接数帝号候选：多于一个就说明用户多半是想挑「哪个朝代的太宗」。
+        // 注意顺序仍由 showSug() 决定：输入本身是完整年号且有更长的同前缀年号（天授→天授禮法延祚）时，
+        // 那里会先渲染「年号候选」框，不受这里影响。
+        //
+        // ⚠️ 例外：结果面板本身已经是「帝号列表」（`kind === 'who-list'`，搜朝代 / 重名帝号）时不再弹框 ——
+        // 框里列的和面板里列的是同一批帝号，而且框是绝对定位、正好盖在面板顶上（把前几行挡住）。
+        let res = null;
+        try {
+            res = search(qEl.value);
+        }
+        catch (e) {
+            res = null;
+        }
+        if (res && res.strictInvalid) {
+            hideSug();
+            return;
+        }
+        // ⚠️ `who-list` 只有 `list`、没有 `rows`，两边都要看，否则会把它当成「没结果」。
+        const hasRows = !!(res && ((res.rows && res.rows.length > 0) || (res.list && res.list.length > 0)));
+        const isWhoList = !!(res && res.kind === 'who-list');
+        // 匹配到多个朝代（「唐」）→ 弹朝代选择框；面板已经默认显示第一个朝代的帝号了。
+        const multiDyn = !!(res && res.multiDyn);
+        const isWho = !isWhoList && !multiDyn && EraSearch.emperors(EraSearch.stripYearTail(qEl.value), 30).length > 1;
+        const onlyDyn = multiDyn;
         const frag = EraSearch.fragmentOf(qEl.value);
-        // 「建武」这类：输入本身就是一个年号，但它还是别的更长年号的开头（建武中元）。
+        // 「天授」这类：输入本身就是一个年号，但它还是别的更长年号的开头（天授禮法延祚）。
         // 这时即使已经有结果，也要弹建议框，让用户能选到更长的那个。
         const exts = extensionPicks(frag);
-        if (!isWho && !onlyDyn && !exts.length && hasResults(qEl.value)) {
+        if (!isWho && !onlyDyn && !exts.length && hasRows) {
             hideSug();
             return;
         }
@@ -732,7 +1124,7 @@
         }, 200);
     });
     // ---- 输入框右侧的 < / >：按年跳转 ----
-    // 公元年直接 ±1。年号按「同年号 → 同帝号 → 同朝代」找上/下一个，到朝代边界就停。
+    // 年份直接 ±1。年号按「同年号 → 同帝号 → 同朝代」找上/下一个，到朝代边界就停。
     // 该年号的最后一年（年份不可考 / 数据颠倒时算不出，返回 null）。
     function lastYearOf(row) {
         const start = row && row.start;
@@ -795,7 +1187,7 @@
             return null;
         if (Number.isFinite(pos.gregorian)) {
             const y = pos.gregorian;
-            // 没有公元 0 年：前1年 的下一年是公元1年，公元1年 的上一年是前1年。
+            // 公历没有 0 年：前1年 的下一年是 1年，1年 的上一年是前1年。
             const next = dir > 0 ? (y === -1 ? 1 : y + 1) : (y === 1 ? -1 : y - 1);
             return { query: D.formatYear(next) };
         }
