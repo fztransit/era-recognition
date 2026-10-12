@@ -704,7 +704,7 @@
                     D.whoText(dynasty, r.emperor, r.name + yearNum + '年', r.name) || '（无朝代信息）'));
                 row.appendChild(left);
                 outEl.appendChild(row);
-                makeExpandable(row, r, r.name);
+                // 已经精确到某一年时，结果行不再展开整条年号的逐年列表。
             }
             return;
         }
@@ -737,7 +737,9 @@
                 right.appendChild(el('span', 'sp-epoch', epoch));
             row.appendChild(right);
             outEl.appendChild(row);
-            makeExpandable(row, r, r.name);
+            // 有明确纪年时结果已经精确到某一年；只有单查年号时才允许展开逐年列表。
+            if (!res.year)
+                makeExpandable(row, r, r.name);
         }
     }
     const sugEl = document.getElementById("sp-sug");
