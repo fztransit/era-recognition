@@ -198,10 +198,12 @@
             C.positionPopupGroup();
     }
     const RANGE_FORM = D.RANGE_FORM;
-    // 「…年」/「…載」/「…甲子年」这类纪年尾巴；干支继续保留。
+    // 「…年」/「…載」/「…甲子年」/「…甲子」这类纪年尾巴；干支继续保留。
     // 「載」见 eras.js 的 YEAR_MARK —— 唐玄宗天寶三年起把「年」写作「載」。
+    // ⚠️ 干支那一支的「年」**可选**（与 buildRegex 的 eraG 对齐：「康熙甲子」也要能预填出「康熙」）；
+    //    数字那一支的「年」**必须**有，否则「建元三」也会被当成合法尾巴。
     const GANZHI_TAIL = '[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]';
-    const CHRONO_TAIL = new RegExp('^(?:' + D.YEAR_NUM_PART + '|' + GANZHI_TAIL + ')' + D.YEAR_MARK + '$');
+    const CHRONO_TAIL = new RegExp('^(?:' + D.YEAR_NUM_PART + D.YEAR_MARK + '|' + GANZHI_TAIL + D.YEAR_MARK + '?)$');
     // 年号后面那一截可以是什么：空（整个标记就是年号，如「改元永興」）、
     // 纪年（「建元三年」）、范围写法（「永興年間 / 貞觀中」）。
     // 少了后两种，「永興年間」这类标记点更正后输入框和候选都是空的。
@@ -228,6 +230,8 @@
     function chronologyOnly(mark) {
         const raw = C.eraTextOf(mark);
         // 只有纪年、没有年号的片段：标准中文数字或干支（「三年」/「三載」/「甲子年」）。
+        // 这里的干支**仍要求带「年」**：裸干支（「甲子」）没有年号兜底，扫描器根本不建标记
+        //（「建隆元年春正月乙巳」的「乙巳」是纪日），所以不存在这种标记。
         return new RegExp('^(?:' + D.CN_YEAR_PART + '|' + GANZHI_TAIL + ')' + D.YEAR_MARK + '$').test(raw);
     }
     function prepareFixInput(mark) {

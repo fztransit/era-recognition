@@ -74,7 +74,7 @@ JavaScript、CSS、HTML 分目录；页面侧 JS 再按功能集中在 `src/js/c
 | 组名     | 形态                            | 例         |
 | ------ | ----------------------------- | --------- |
 | `era`  | 年号 + 纪年数字 + 年                 | 建元三年、建元3年 |
-| `eraG` | 年号 + 干支 + 年                   | 建元甲子年     |
+| `eraG` | 年号 + 干支（末尾「年」**可省略**）         | 建元甲子年、康熙甲子 |
 | `eraC` | 改元 + 年号（前置断言）                 | 改元永興      |
 | `eraR` | 年号 + 年间 / 年間 / 中 / 初 / 末 | 永興年間      |
 | `eraM` | 年号 + 中 / 初 / 末（判定**不在正则里**，见下）    | 貞觀中       |
@@ -94,11 +94,19 @@ JavaScript、CSS、HTML 分目录；页面侧 JS 再按功能集中在 `src/js/c
 
 **省略年号的纪年**只认标准中文数字「元年」「二年」～「六十一年」，仍要求前面是标点、空白、段首或「诏 / 詔 / 其 / 起 / 讫 / 訖」；阿拉伯数字不走这一条，以免把普通公历年份误标成纪年。
 
+**`eraG`（年号 + 干支）末尾的「年」可以省略** ——「康熙甲子」和「康熙甲子年」同义，干支本身已经说明了是哪一年，古籍里两种写法都常见。侧边栏的查询解析（`sidepanel.js` 的 `ganzhiBarePattern`）一直就认「康熙甲子」，这次把正文识别对齐（`buildRegex()` 里 `eraG` 的 `YEAR_MARK` 改成 `YEAR_MARK + '?'`）。
+
+- 只放宽 `eraG`：**`era`（年号 + 数字）的「年」绝不能省** ——「建元三」和「建元三十三年」分不开，而且「三」会被当成一个独立的数字吞掉。
+- 也**不要**把这条挪到裸干支（`content-scanner.js` / `canvas-adapter.js` 的 `BARE_GZ`）：那边没有年号兜底，「建隆元年春正月乙巳……二年春正月丙申朔」里的「乙巳」「丙申」是**干支纪日**，会被整片误标成年。裸干支（「甲子」单独出现）也因此仍然不建标记，`chronologyOnly()` 保持「必须带年」。
+- 干支落在该年号有效范围之外时（如「雍正甲子」），仍认年号、标 `ganzhiOutOfRange`，只是不给具体公元年 —— 和带「年」的写法一致。
+- 更正面板的纪年尾巴 `CHRONO_TAIL`（`content-correction.js`）同步放宽：干支那一支的「年」可选（「康熙甲子」点更正要能预填出「康熙」），数字那一支的「年」仍必需（否则「建元三」也会被当成合法尾巴）。
+- 回归：`.workbuddy-ai/repro/check-ganzhi-bare.cjs`（DOM 端到端 12 + 解析层 13 + canvas 侧 4 + 更正面板 13 + 误标守卫 6 + 全表 1347 条年号各扫一遍）。
+
 **「年」也写作「載 / 载」** —— 唐玄宗天寶三年（744）改「年」為「載」，肅宗乾元元年（758）才改回，所以「天寶三載」「貞觀十載」这类写法在古籍里常见。`eras.js` 导出 `YEAR_MARK = '(?:年|載|载)'`，凡**数年份**的位置都显式引用它：
 
 | 位置 | 文件 |
 | --- | --- |
-| `era`（年号+数字+年）/ `eraG`（年号+干支+年） | `eras.js` 的 `buildRegex` |
+| `era`（年号+数字+年）/ `eraG`（年号+干支，末尾「年」可省） | `eras.js` 的 `buildRegex` |
 | 裸纪年 / 裸干支（`BARE_YEAR` / `BARE_GZ` / `BARE_YEAR_HEAD`） | `content-scanner.js`、`canvas-adapter.js` |
 | 从标记文字里抽年数 | `content-annotation.js` |
 | 更正面板的纪年尾巴（`CHRONO_TAIL` / `chronologyOnly`） | `content-correction.js` |
@@ -127,7 +135,7 @@ JavaScript、CSS、HTML 分目录；页面侧 JS 再按功能集中在 `src/js/c
 
 **高亮带上「谁」（朝代 + 帝号）**：紧挨在「年号 + 纪年 / 范围写法」前面的朝代名、帝号也一起高亮 —— 「唐貞觀五年」「唐貞觀年間」「大唐貞觀中」整段高亮，「大唐貞觀五年」连「大」一起；带帝号的「唐僖宗廣明元年」「僖宗廣明元年」也整段高亮。规则：
 
-- **带年号的写法都扩**：`era`（年号+纪年数字）、`eraG`（年号+干支年）、`eraR`（年号+年間 / 年間 / 年初 / 年末）、`eraM`（年号+中 / 初 / 末）。
+- **带年号的写法都扩**：`era`（年号+纪年数字）、`eraG`（年号+干支年，末尾「年」可省）、`eraR`（年号+年間 / 年間 / 年初 / 年末）、`eraM`（年号+中 / 初 / 末）。
 - **不扩**：`eraB`（独立年号 —— 就是「只有朝代 + 年号」那种）、以及裸纪年（「只有朝代 + 纪年」，走 `applyContextMatches` 那条路）。
 - **`eraC`（改元永興）实际也扩不到**：它的匹配是从年号开始的，前面挡着「改元」两个字，`whoPrefixLength()` 看到的是「元」，自然不扩 —— 所以没把它列进条件里。
 - 判据是 `eras.js` 的 `D.whoPrefixLength(before)`（旧名 `dynastyPrefixLength`，已改名）。它按「**朝代 + 帝号** → **帝号** → **朝代**」三层依次往左吃，每一段都**必须紧挨着**：
@@ -225,7 +233,7 @@ canvas 侧另外几个要点：
 | `__eraInfo`    | 候选数组（可能多个，见 3.2）         |
 | `__eraRange`   | 是否「年间 / 中 / 初 / 末」这类范围写法 |
 | `__eraN`       | 这一处的纪年数（「三年」= 3，「元年」= 1） |
-| `__eraGz`      | 干支（「甲子年」= 甲子）            |
+| `__eraGz`      | 干支（「甲子年」/「康熙甲子」= 甲子）    |
 | `__eraDynasty` | 已采用的朝代（用于下文沿用）           |
 | `__eraKey`     | **记录用的键**，见 4.1          |
 | `__eraPrevEl`  | 上文那处年号标记（DOM 路径专用，用于继承）  |
@@ -496,8 +504,8 @@ canvas 没有 `__eraPrevEl`（标记是覆盖层，不在正文流里），对�
 > 一律「未查询到该年号」。「年间 / 中 / 初 / 末」也不再当标记剥掉 —— 「中」「末」因此和「太」「武」「貞」
 > 一样走帝号（表里有 中廢公 / 末帝），行为一致。
 >
-> 回归：`.workbuddy-ai/repro/check-sidepanel-parse.cjs` 的 G 段（21 个输入逐条断言，含 4 个范围写法查不到）
-> + 全表抽样扫描（朝代+帝号+年号 / 朝代+年号 / 帝号+年号 / 年号+元年 各 34~68 条，逐条查回自己）。
+> 回归：脚本 `check-sidepanel-parse.cjs` **已于 2026-10-17 删除**（它当时已和现有代码对不上），
+> 这层解析行为暂时没有自动化覆盖；要恢复的话按「改测试对齐现有代码」的方向重写，不要改 `sidepanel.js`。
 
 ### 5.1.1 结果行的「朝代 · 帝号 · 年号」也走去重
 
@@ -586,7 +594,7 @@ canvas 没有 `__eraPrevEl`（标记是覆盖层，不在正文流里），对�
 - **`start` / `end` 不可知的条目不展开**（夏商那 44 条只留下王名）——`yearsUnknown()` 为真时直接返回 `null`，行上不加箭头、不绑事件，右侧照旧显示「未知」。
 - 展开块用 `insertAdjacentElement('afterend')` 插在行后面，所以**多行可以同时展开**、互不串位；再点一下收起，`aria-expanded` 跟着切。行上有 `▸ / ▾` 箭头（CSS `::before`）提示可点。
 - 点行**只展开**：不改输入框、不触发重新搜索。和 5.6 的帝号建议框不同 —— 那个点了会改输入框重新查。
-- 回归：`.workbuddy-ai/repro/check-sidepanel-years.cjs`（汉武帝 → 太初 4 年逐字断言 + 多行同时展开 + 同名年号 5 条都能展开 + 未知年份不展开 + 按公元年查也能展开 + 点行不改输入框 + CSS 的 1em / space-between / 箭头）。
+- 回归：脚本 `check-sidepanel-years.cjs` **已于 2026-10-17 删除**（汉武帝 → 太初 4 年逐字断言 + 多行同时展开 + 同名年号 5 条都能展开 + 未知年份不展开 + 按公元年查也能展开 + 点行不改输入框 + CSS 的 1em / space-between / 箭头 —— 这些当时都是验过的）。
 
 ### 5.8 搜朝代 → 列出该朝代的帝号 → 点开看年号
 
@@ -609,7 +617,7 @@ canvas 没有 `__eraPrevEl`（标记是覆盖层，不在正文流里），对�
 - ⚠️ **单朝代（面板已是帝号列表、又不弹框）时不会再弹帝号建议框**（`input` 处理里 `isWho` 带了 `!isWhoList`）—— 否则框里列的和面板里列的是同一批，而且框是绝对定位、正好盖在面板顶上把前几行挡住。
   注意 `who-list` 只有 `list` 没有 `rows`，判「有没有结果」时两边都要看（`hasRows`）。
 - 已知特例：`成` 同时是 2 个朝代名的子串（`成漢` / `大成`）→ 按规则弹朝代框，而不是原来的帝号建议。
-- 回归：`.workbuddy-ai/repro/check-sidepanel-years.cjs` 的 H 段（西漢 → 13 个帝号、点开武帝 → 11 个年号、再点建元 → 6 年；武帝仍是面板给年号）。
+- 回归：`check-sidepanel-years.cjs` 的 H 段（西漢 → 13 个帝号、点开武帝 → 11 个年号、再点建元 → 6 年；武帝仍是面板给年号）—— 脚本已删（2026-10-17）。
 
 ---
 
@@ -897,9 +905,9 @@ NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-theme-menu.cjs   
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-range-head.cjs       # eraM（年号+中/初/末）边界判在 hlIndex 上 + DOM 端到端 + canvas 侧一致性
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-regex-reset-alert.cjs # 「正则重置」不闪黄：快响应无黄提示 / 慢响应有 / 失败走红
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-year-zai.cjs        # 「年」写成「載 / 载」：DOM + canvas + 查询 + 更正面板 + 误标守卫
+NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-ganzhi-bare.cjs     # 年号+干支省略「年」（康熙甲子）：DOM + 解析 + canvas + 更正面板 + 干支纪日守卫
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-sidepanel-who.cjs    # 侧边栏：帝号重名（太宗 / 太祖…）也弹「朝代 · 帝号」选择框
-NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-sidepanel-years.cjs  # 侧边栏：点开年号行，列出该年号每一年（纪年 / 公元年 / 干支）
-NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-sidepanel-parse.cjs  # 侧边栏：整串输入就是年号（含 6 字）+ 建议框点同名年号收窄
+# check-sidepanel-years.cjs / check-sidepanel-parse.cjs 已于 2026-10-17 删除（侧边栏解析 / 逐年展开暂时没有自动化覆盖）
 ```
 
 ### 8.2 三个容易踩的实现坑

@@ -171,8 +171,15 @@
     //    以后新增 buildRegex({ range: true }) 的消费者，记得也补这一步。
     function buildRegex(opts) {
         const standalone = !!(opts && opts.standalone);
+        // eraG（年号 + 干支）末尾的「年」是**可选**的 —— 古籍里「康熙甲子」和「康熙甲子年」一个意思，
+        // 干支本身就说明了是哪一年，不必再写「年」字。侧边栏的查询解析（sidepanel.js 的
+        // ganzhiBarePattern）一直就是这么认的，这里对齐。
+        // ⚠️ 只有 eraG 能省 —— era（年号 + 数字）的「年」绝不能省：数字后面没有「年」字时
+        //    「建元三」和「建元三十三年」分不开，且「贞观三年」的「三」会被当成独立数字吞掉。
+        // ⚠️ 同理**不要**把这条放宽挪到裸干支（content-scanner.js / canvas-adapter.js 的 BARE_GZ）：
+        //    那边没有年号兜底，「建隆元年春正月乙巳」里的「乙巳」是**纪日**，会全被误标成年。
         const parts = [
-            '(?<eraG>' + NAME_PART + ')' + SP + '(?<gz>' + GANZHI_PART + ')' + SP + YEAR_MARK,
+            '(?<eraG>' + NAME_PART + ')' + SP + '(?<gz>' + GANZHI_PART + ')' + SP + YEAR_MARK + '?',
             '(?<era>' + NAME_PART + ')' + SP + '(?<num>' + NUM_PART + ')' + SP + YEAR_MARK,
         ];
         // 改元 + 年号
