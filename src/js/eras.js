@@ -143,7 +143,17 @@
         }
         return -1;
     }
-    const GANZHI_PART = '(?:[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])';
+    // 干支**只有 60 个**，不是 10×12=120 的笛卡尔积：天干地支各按阴阳排，
+    // 阳干（甲丙戊庚壬）只配阳支（子寅辰午申戌），阴干（乙丁己辛癸）只配阴支（丑卯巳未酉亥）。
+    // 所以「癸子」「甲丑」这种阴阳错配的写法**根本不存在**（癸是阴干、子是阳支），不能被认成干支。
+    // 拆成两支写：5×6 + 5×6 = 30 + 30 = 60。
+    //
+    // ⚠️ 这是**唯一**的干支定义，别在别处再抄一份 10×12 的字符类 ——
+    //    以前散在 6 个文件里各写一遍，结果「癸子年」在正文里也被标成了纪年。
+    //    消费方：eras.js 的 buildRegex（eraG）· content-scanner.js / canvas-adapter.js 的
+    //    BARE_GZ 与 gzAfter · content-correction.js 的 GANZHI_TAIL · sidepanel.js 的 GANZHI_PART。
+    //    加新的干支匹配点时，引用 `D.GANZHI_PART`，别再手写字符类。
+    const GANZHI_PART = '(?:[甲丙戊庚壬][子寅辰午申戌]|[乙丁己辛癸][丑卯巳未酉亥])';
     const SP = '[ \\t\\u3000]*';
     // 「年」的另一种写法：唐玄宗天寶三年（744）改「年」為「載」，到肅宗乾元元年（758）才改回「年」，
     // 所以「天寶三載」「貞觀十載」这类写法在古籍里常见，简繁两种都要认。
@@ -153,6 +163,39 @@
     //            content-annotation.js 抽年数，content-correction.js 的纪年尾巴，
     //            era-search.js / sidepanel.js 的查询解析。
     const YEAR_MARK = '(?:年|載|载)';
+    // 「光秃秃的年号 + 干支」里**不认**的年号（用户 2026-10-18 要求）。
+    //
+    // 为什么单拎出「上元」：历法术数里「上元甲子 / 上元乙丑…」指的是三元九运的**起算点**
+    //（上元、中元、下元各配六十年），跟哪位皇帝在位没关系，正文里出现时根本不是纪年。
+    // 但「上元」本身是**真实年号**（唐·高宗 674-676、唐·肅宗 760-761、南詔·異牟尋 784-808），
+    // 所以**只拦「上元 + 干支」这一个光秃秃的形态**，见下面 `excludedEraG()`。
+    //
+    // ⚠️ 这条**不能写在正则里**：判据之一是「前面紧挨着朝代 / 帝号」，而年号前面的朝代 / 帝号
+    //    前缀本来就是在正则外面算的（见 `whoPrefixLength` 上面那段说明 —— 正则里看不到「唐」）。
+    //    所以给调用方一个 `excludedEraG()`，**两个扫描器都必须调用**（和 eraM 的边界过滤一样）：
+    //      content-scanner.js 的 runRegex
+    //      canvas-adapter.js 的 findMatches
+    //    以后新增 buildRegex 的消费者，记得也补这一步，否则「上元甲子」会被标出来。
+    //    （applyContextMatches 那条路只处理 eraR / eraM，eraG 在那儿本来就被跳过了。）
+    // ⚠️ 只写**年号名**（表里的写法），不加「年」「年间」之类。要再加排除项直接往数组里放。
+    // ⚠️ 必须放在 YEAR_MARK 之后：ERA_G_YEAR_TAIL 要用它（const 有 TDZ，放前面会直接抛错）。
+    const ERA_G_EXCLUDED = ['上元'];
+    const ERA_G_EXCLUDED_SET = new Set(ERA_G_EXCLUDED.map(canonicalForm));
+    // matched 末尾是不是「年 / 載 / 载」—— 带了就说明不是光秃秃的干支。
+    const ERA_G_YEAR_TAIL = new RegExp(YEAR_MARK + '$');
+    // 这个 eraG 匹配该不该丢掉？**只拦光秃秃的「上元 + 干支」**：
+    //   上元甲子 / 上元乙丑        → 丢（术数里的「上元」）
+    //   上元甲子年                 → 留（带了「年」，是正经纪年写法）
+    //   唐上元甲子 / 唐高宗上元甲子 → 留（前面紧挨着朝代 / 帝号）
+    //   上元三年 / 上元年間         → 走 era / eraR 分支，压根不经过这里
+    //   eraName —— 捕获到的年号；matched —— 整个匹配；before —— 匹配起点之前的正文。
+    function excludedEraG(eraName, matched, before) {
+        if (!ERA_G_EXCLUDED_SET.size || !ERA_G_EXCLUDED_SET.has(canonicalForm(eraName)))
+            return false;
+        if (whoPrefixLength(before) > 0)
+            return false;
+        return !ERA_G_YEAR_TAIL.test(String(matched == null ? '' : matched));
+    }
     // 「年号 + 中/初/末」（不带「年」字）这里**不加任何边界约束** —— 约束放在调用方做。
     //
     // 为什么不能在正则里做：要看的是「整段高亮起点」前面是不是标点，而高亮起点可能比年号还靠左
@@ -178,6 +221,8 @@
         //    「建元三」和「建元三十三年」分不开，且「贞观三年」的「三」会被当成独立数字吞掉。
         // ⚠️ 同理**不要**把这条放宽挪到裸干支（content-scanner.js / canvas-adapter.js 的 BARE_GZ）：
         //    那边没有年号兜底，「建隆元年春正月乙巳」里的「乙巳」是**纪日**，会全被误标成年。
+        // ⚠️ 「上元甲子」这类要排除的形态**不在这里处理** —— 正则看不到朝代 / 帝号前缀，
+        //    由调用方用 `D.excludedEraG()` 过滤，见上面的常量说明。
         const parts = [
             '(?<eraG>' + NAME_PART + ')' + SP + '(?<gz>' + GANZHI_PART + ')' + SP + YEAR_MARK + '?',
             '(?<era>' + NAME_PART + ')' + SP + '(?<num>' + NUM_PART + ')' + SP + YEAR_MARK,
@@ -566,6 +611,9 @@
         YEAR_MARK: YEAR_MARK,
         ganzhiOf: ganzhiOf,
         ganzhiOffsetIn: ganzhiOffsetIn,
+        GANZHI_PART: GANZHI_PART,
+        ERA_G_EXCLUDED: ERA_G_EXCLUDED,
+        excludedEraG: excludedEraG,
         DYNASTY_ALIAS: DYNASTY_ALIAS,
         contextNames: contextNames,
         whoPrefixLength: whoPrefixLength,

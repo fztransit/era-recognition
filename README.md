@@ -100,7 +100,27 @@ JavaScript、CSS、HTML 分目录；页面侧 JS 再按功能集中在 `src/js/c
 - 也**不要**把这条挪到裸干支（`content-scanner.js` / `canvas-adapter.js` 的 `BARE_GZ`）：那边没有年号兜底，「建隆元年春正月乙巳……二年春正月丙申朔」里的「乙巳」「丙申」是**干支纪日**，会被整片误标成年。裸干支（「甲子」单独出现）也因此仍然不建标记，`chronologyOnly()` 保持「必须带年」。
 - 干支落在该年号有效范围之外时（如「雍正甲子」），仍认年号、标 `ganzhiOutOfRange`，只是不给具体公元年 —— 和带「年」的写法一致。
 - 更正面板的纪年尾巴 `CHRONO_TAIL`（`content-correction.js`）同步放宽：干支那一支的「年」可选（「康熙甲子」点更正要能预填出「康熙」），数字那一支的「年」仍必需（否则「建元三」也会被当成合法尾巴）。
-- 回归：`.workbuddy-ai/repro/check-ganzhi-bare.cjs`（DOM 端到端 12 + 解析层 13 + canvas 侧 4 + 更正面板 13 + 误标守卫 6 + 全表 1347 条年号各扫一遍）。
+- **「上元」的「年号 + 干支」只拦光秃秃的形态**（2026-10-18）：历法术数里「上元甲子 / 上元乙丑…」指的是三元九运的**起算点**（上元 / 中元 / 下元各配六十年），跟哪位皇帝在位没关系，正文里出现时不是纪年。但「上元」本身是**真实年号**（唐·高宗 674-676、唐·肅宗 760-761、南詔·異牟尋 784-808），所以只拦这一种形态：
+
+  | 写法 | 认不认 | 理由 |
+  | --- | --- | --- |
+  | `上元甲子` / `上元乙丑` | **不认** | 光秃秃的年号+干支，术数里的「上元」 |
+  | `上元甲子年` | 认 | 带了「年」，是正经纪年写法（南詔·上元元年 = 784 = 甲子） |
+  | `唐上元甲子` / `唐高宗上元甲子` / `大唐上元甲子` | 认 | 前面紧挨着朝代 / 帝号 |
+  | `上元三年` / `上元年間` | 认 | 走 `era` / `eraR` 分支，压根不经过这里 |
+
+  - 实现：`eras.js` 的 `ERA_G_EXCLUDED = ['上元']` + `excludedEraG(eraName, matched, before)` —— 三条判据：在排除清单里 **且** 匹配末尾没有「年 / 載 / 载」**且** `whoPrefixLength(before) === 0`（前面没有朝代 / 帝号）。
+  - ⚠️ **这条不能写在正则里**：判据之一是「前面紧挨着朝代 / 帝号」，而那个前缀本来就是在正则外面算的（正则里看不到「唐」）。所以是调用方过滤，**两个扫描器都必须调**（和 `eraM` 的边界过滤一样）：`content-scanner.js` 的 `runRegex`、`canvas-adapter.js` 的 `findMatches`。以后新增 `buildRegex` 的消费者记得也补这一步。（`applyContextMatches` 只处理 `eraR`/`eraM`，`eraG` 在那儿本来就被跳过。）
+  - `standalone`（独立年号）模式：`eraG` 仍先命中、随后被丢，所以不会退回 `eraB` 去标「上元」—— 页面上同样什么都不标。
+- 回归：`.workbuddy-ai/repro/check-ganzhi-bare.cjs`（DOM 端到端 12 + 解析层 13 + canvas 侧 4 + 更正面板 13 + 误标守卫 6 + 全表 1347 条年号各扫一遍 + 上元 23 + 干支 24）。
+
+**干支只有 60 个**（2026-10-18 修）：天干地支各按阴阳排 —— 阳干（甲丙戊庚壬）只配阳支（子寅辰午申戌），阴干（乙丁己辛癸）只配阴支（丑卯巳未酉亥）。所以「癸子」「甲丑」这种阴阳错配的写法**根本不存在**，不能认成干支。
+
+- 定义只有一处：`eras.js` 的 `GANZHI_PART = '(?:[甲丙戊庚壬][子寅辰午申戌]|[乙丁己辛癸][丑卯巳未酉亥])'`，导出成 `D.GANZHI_PART`。5×6 + 5×6 = 30 + 30 = 60。
+- ⚠️ **别再手写 `[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]`** —— 那是 10×12 = 120 的笛卡尔积，一半是不存在的组合。以前散在 6 个文件里各写一遍，于是「癸子年」在正文里也会被标成纪年。
+- 消费方（都引用 `D.GANZHI_PART`，不再各写一份）：`eras.js` 的 `buildRegex`（`eraG`）· `content-scanner.js` / `canvas-adapter.js` 的 `BARE_GZ` 与 `GANZHI_HEAD`（就是原来那句「纪年数字后面紧跟干支」的判断）· `content-correction.js` 的 `GANZHI_TAIL` · `sidepanel.js` 的 `GANZHI_PART`。
+- 回归：`check-ganzhi-bare.cjs` 的 H 段（120 种写法只认 60 个 + 和 `ganzhiOf()` 的六十甲子逐一对上 + 页面不标「癸子年」「康熙癸子」+ 四个消费方都在用共享定义、没有手写 120 的字符类）。
+
 
 **「年」也写作「載 / 载」** —— 唐玄宗天寶三年（744）改「年」為「載」，肅宗乾元元年（758）才改回，所以「天寶三載」「貞觀十載」这类写法在古籍里常见。`eras.js` 导出 `YEAR_MARK = '(?:年|載|载)'`，凡**数年份**的位置都显式引用它：
 
@@ -905,7 +925,7 @@ NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-theme-menu.cjs   
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-range-head.cjs       # eraM（年号+中/初/末）边界判在 hlIndex 上 + DOM 端到端 + canvas 侧一致性
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-regex-reset-alert.cjs # 「正则重置」不闪黄：快响应无黄提示 / 慢响应有 / 失败走红
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-year-zai.cjs        # 「年」写成「載 / 载」：DOM + canvas + 查询 + 更正面板 + 误标守卫
-NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-ganzhi-bare.cjs     # 年号+干支省略「年」（康熙甲子）：DOM + 解析 + canvas + 更正面板 + 干支纪日守卫
+NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-ganzhi-bare.cjs     # 年号+干支省略「年」（康熙甲子）+ 上元不认干支：DOM + 解析 + canvas + 更正面板 + 误标守卫
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-sidepanel-who.cjs    # 侧边栏：帝号重名（太宗 / 太祖…）也弹「朝代 · 帝号」选择框
 # check-sidepanel-years.cjs / check-sidepanel-parse.cjs 已于 2026-10-17 删除（侧边栏解析 / 逐年展开暂时没有自动化覆盖）
 ```

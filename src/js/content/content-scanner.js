@@ -7,7 +7,10 @@
     const MT = C.MT;
     const R = C.runtime;
     // 年份标记认「年」也认「載 / 载」（唐玄宗天寶三年起改「年」為「載」）。见 eras.js 的 YEAR_MARK。
-    const BARE_GZ = /([甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])(?:年|載|载)/g;
+    // 干支用 `D.GANZHI_PART`（只有 60 个合法组合），别再手写 10×12 的字符类 —— 那样「癸子」也会被认。
+    const BARE_GZ = new RegExp('(' + D.GANZHI_PART + ')' + D.YEAR_MARK, 'g');
+    // 判断「某个纪年数字后面紧跟的是不是干支」用，只测开头两位。
+    const GANZHI_HEAD = new RegExp('^' + D.GANZHI_PART);
     // 省略年号的纪年只认标准中文数字：元年、二年～六十一年。
     const BARE_YEAR = new RegExp('(' + D.CN_YEAR_PART + ')' + D.YEAR_MARK, 'g');
     // 「没有年号的纪年」（如「二年」「三十三年」）只看它**前面**是什么 —— 段首也算边界。
@@ -236,7 +239,7 @@
                     continue;
                 if (text.charAt(match.index - 1) === '积' || text.charAt(match.index - 1) === '積')
                     continue;
-                const gzAfter = /^[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]/
+                const gzAfter = GANZHI_HEAD
                     .test(text.slice(match.index + match[0].length, match.index + match[0].length + 2));
                 if (!gzAfter && !isBoundary(node, match.index))
                     continue;
@@ -321,6 +324,11 @@
                     continue;
                 }
                 const groups = match.groups || {};
+                // 「上元甲子」这种**光秃秃的年号+干支**不认（术数里的「上元」）；
+                // 带了「年」（上元甲子年）或前面有朝代 / 帝号（唐上元甲子）照常认。
+                // 判据要看前面的朝代 / 帝号，正则里做不到 —— 见 eras.js 的 excludedEraG()。
+                if (groups.eraG && D.excludedEraG(groups.eraG, match[0], text.slice(0, match.index)))
+                    continue;
                 const info = D.resolve(match);
                 if (info && info.length) {
                     const hit = { index: match.index, end: match.index + match[0].length, info };

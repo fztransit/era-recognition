@@ -24,7 +24,9 @@
     function yearLabel(n) {
         return Number(n) === 1 ? '元' : cnNum(n);
     }
-    const GANZHI_PART = '[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]';
+    // 干支只有 60 个合法组合（阳干配阳支、阴干配阴支），统一用 eras.js 那份定义 ——
+    // 这里以前自己抄了一份 10×12 的字符类，于是「癸子」也会被当成干支去查。
+    const GANZHI_PART = D.GANZHI_PART;
     // 年份标记认「年」也认「載 / 载」（见 eras.js 的 YEAR_MARK）。
     const YEAR_MARK = D.YEAR_MARK;
 

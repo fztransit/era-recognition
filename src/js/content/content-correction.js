@@ -202,7 +202,8 @@
     // 「載」见 eras.js 的 YEAR_MARK —— 唐玄宗天寶三年起把「年」写作「載」。
     // ⚠️ 干支那一支的「年」**可选**（与 buildRegex 的 eraG 对齐：「康熙甲子」也要能预填出「康熙」）；
     //    数字那一支的「年」**必须**有，否则「建元三」也会被当成合法尾巴。
-    const GANZHI_TAIL = '[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]';
+    // 干支用 `D.GANZHI_PART`（只有 60 个合法组合），别再手写 10×12 的字符类。
+    const GANZHI_TAIL = D.GANZHI_PART;
     const CHRONO_TAIL = new RegExp('^(?:' + D.YEAR_NUM_PART + D.YEAR_MARK + '|' + GANZHI_TAIL + D.YEAR_MARK + '?)$');
     // 年号后面那一截可以是什么：空（整个标记就是年号，如「改元永興」）、
     // 纪年（「建元三年」）、范围写法（「永興年間 / 貞觀中」）。
