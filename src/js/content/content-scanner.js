@@ -105,6 +105,7 @@
         if (typeof C.candidateOf === 'function')
             return C.candidateOf(row, null);
         return {
+            id: row.id,
             era: row.name,
             dynasty: row.dynasty,
             emperor: row.emperor,

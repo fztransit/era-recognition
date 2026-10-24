@@ -8,19 +8,22 @@
         const s = raw == null ? '' : String(raw);
         return s.replace(/[（）()]/g, '').trim();
     }
-    // 表里第 6 列：start 那一年是这个年号的第几年（缺省 1，即 start 就是元年）。
-    // 例：["北漢","英武帝","天會",968,973,12] → 968 是天會十二年 → 天會元年 = 957。
+    // 表里第 7 列：start 那一年是这个年号的第几年（缺省 1，即 start 就是元年）。
+    // 例：["北漢","北漢","英武帝","天會",968,973,12] → 968 是天會十二年 → 天會元年 = 957。
     function rowOffset(row) {
-        const n = Number(row && row[5]);
+        const n = Number(row && row[6]);
         return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
     }
+    // 第 1 列是朝代 id（从 1 开始的数字，一个政权一个：同名朝代各占一个 id）。
     const ERAS = TABLE.map(function (row) {
+        const id = Number(row[0]);
         return {
-            dynasty: row[0] || '',
-            emperor: row[1] || '',
-            name: cleanEraName(row[2]),
-            start: row[3],
-            end: row[4] === undefined ? null : row[4],
+            id: Number.isFinite(id) && id > 0 ? id : null,
+            dynasty: row[1] || '',
+            emperor: row[2] || '',
+            name: cleanEraName(row[3]),
+            start: row[4],
+            end: row[5] === undefined ? null : row[5],
             offset: rowOffset(row)
         };
     }).filter(function (e) { return typeof e.name === 'string' && e.name; });
@@ -399,6 +402,80 @@
         const eras = lookupEra(last);
         return eras.length === 1 ? eras[0] : null;
     }
+    // ---- 朝代优先级 ----
+    // 同一段文字命中多个朝代的年号时（「大安元年」= 遼 / 西夏 / 金），默认取
+    // era-table.js 的 DYNASTY_PRIORITY 里**排在最前**的那个。
+    // 表里写的是朝代 id（TABLE 第 1 列，从 1 开始的数字），一个政权一个，
+    // 所以「春秋齊 / 南齊 / 唐末齊」这种同名不同时期的政权能分开排。
+    // 这张表只决定「默认选哪一条」；候选列表本身的顺序（卡片里的行）一律不动。
+    const DYNASTY_PRIORITY = (global.EraTable && global.EraTable.DYNASTY_PRIORITY) || [];
+    // 朝代 id 归一化：数字（也容忍 "12" 这种字符串写法）。
+    function eraIdOf(value) {
+        const n = Number(value);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    const PRIORITY_RANK = new Map();     // 朝代 id → 在优先级表里的位置
+    DYNASTY_PRIORITY.forEach(function (value, index) {
+        const id = eraIdOf(value);
+        if (id !== null && !PRIORITY_RANK.has(id))
+            PRIORITY_RANK.set(id, index);
+    });
+    // 朝代名 → 这个朝代名在表里**第一次**出现的那条的 id 位置。
+    // 只给「没有 id」的候选兜底：AI 给的候选、用户手填的年号都不带 id。
+    const RANK_BY_DYNASTY = new Map();
+    for (const e of ERAS) {
+        const key = canonicalForm(e.dynasty);
+        if (!key || RANK_BY_DYNASTY.has(key))
+            continue;
+        const rank = PRIORITY_RANK.get(e.id);
+        if (rank !== undefined)
+            RANK_BY_DYNASTY.set(key, rank);
+    }
+    // 光有朝代名时的位置；写法差异（唐朝 / 大唐 / 西汉）用 canonicalForm + 去尾「朝」/ 去头「大」兜一下。
+    // 表里没列到的排最后（Infinity = 保持原表顺序）。
+    function dynastyRank(dynasty) {
+        const raw = String(dynasty || '').trim();
+        if (!raw)
+            return Infinity;
+        const keys = [raw, raw.replace(/[朝]$/, '')];
+        if (raw.length > 1 && raw.charAt(0) === '大')
+            keys.push(raw.slice(1));
+        for (const key of keys) {
+            const rank = RANK_BY_DYNASTY.get(canonicalForm(key));
+            if (rank !== undefined)
+                return rank;
+        }
+        return Infinity;
+    }
+    // 一条候选在优先级表里的位置：**优先按 id**（精确到「哪一段」），没 id 才退回朝代名。
+    function candidateRank(info) {
+        if (!info)
+            return Infinity;
+        const id = eraIdOf(info.id);
+        if (id !== null) {
+            const rank = PRIORITY_RANK.get(id);
+            if (rank !== undefined)
+                return rank;
+        }
+        return dynastyRank(info.dynasty);
+    }
+    // 多条候选里按朝代优先级挑一条，返回它的下标（候选为空时 -1）。
+    // 同朝代的多条保持原有先后（只在「严格更靠前」时才换）。
+    function pickByDynastyPriority(candidates) {
+        const list = Array.isArray(candidates) ? candidates : [];
+        if (!list.length)
+            return -1;
+        let best = 0;
+        let bestRank = candidateRank(list[0]);
+        for (let i = 1; i < list.length; i++) {
+            const rank = candidateRank(list[i]);
+            if (rank < bestRank) {
+                best = i;
+                bestRank = rank;
+            }
+        }
+        return best;
+    }
     function pickByContext(candidates, before) {
         const list = Array.isArray(candidates) ? candidates : [];
         if (list.length < 2)
@@ -497,6 +574,7 @@
         const valid = Number.isFinite(n) && hasStart;
         const gregorian = valid ? eraYear(era.start, n, era.offset) : null;
         return {
+            id: era.id,
             era: era.name,
             dynasty: era.dynasty,
             emperor: era.emperor,
@@ -644,6 +722,9 @@
         contextNames: contextNames,
         whoPrefixLength: whoPrefixLength,
         pickByContext: pickByContext,
+        pickByDynastyPriority: pickByDynastyPriority,
+        dynastyRank: dynastyRank,
+        candidateRank: candidateRank,
         contextFromEarlierEra: contextFromEarlierEra,
         toGregorian: toGregorian,
         shiftYear: shiftYear,

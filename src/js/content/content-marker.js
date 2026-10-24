@@ -112,7 +112,19 @@
             ? match.n
             : (mark.__eraInfo[0] && Number.isFinite(mark.__eraInfo[0].n) ? mark.__eraInfo[0].n : null);
         mark.__eraGz = match.gz || null;
-        mark.__eraDynasty = mark.__eraInfo[0] && mark.__eraInfo[0].dynasty ? String(mark.__eraInfo[0].dynasty) : '';
+        // 默认朝代：AI 结果以 AI 给的那条为准；正则识别命中多条候选（「大安元年」= 遼 / 西夏 / 金）时
+        // 按朝代优先级表挑（era-table.js 的 DYNASTY_PRIORITY，见 eras.js 的 pickByDynastyPriority）。
+        // 这个值既是 pickIndex() 的「首选朝代」，又是下文标记继承的起点，所以必须是真正选中的那一条。
+        // ⚠️ 候选列表本身不动 —— 卡片里的行序仍是原表 / 年份顺序。
+        const ownList = mark.__eraInfo;
+        let ownDynasty = ownList[0] && ownList[0].dynasty ? String(ownList[0].dynasty) : '';
+        if (source !== 'ai' && ownList.length > 1) {
+            const byPriority = C.D && typeof C.D.pickByDynastyPriority === 'function'
+                ? C.D.pickByDynastyPriority(ownList) : -1;
+            if (byPriority >= 0 && ownList[byPriority])
+                ownDynasty = String(ownList[byPriority].dynasty || '');
+        }
+        mark.__eraDynasty = ownDynasty;
         if (mark.__eraDynasty)
             mark.setAttribute('data-era-dynasty', mark.__eraDynasty);
         // 键用「年号那一段」算，不用高亮那一段：加了朝代前缀也不会让用户之前存的更正失效。

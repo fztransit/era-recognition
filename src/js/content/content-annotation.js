@@ -51,6 +51,7 @@
         const offset = Number.isFinite(era.offset) && era.offset >= 1 ? era.offset : 1;
         const gregorian = hasStart && Number.isFinite(n) && n >= 1 ? D.eraYear(era.start, n, offset) : null;
         return {
+            id: era.id,
             era: era.name,
             dynasty: era.dynasty,
             emperor: era.emperor,
@@ -260,7 +261,13 @@
                 return preferredIndex;
         }
         const picked = D.pickByContext(list, precedingText(mark, 200));
-        return picked ? Math.max(0, list.indexOf(picked)) : 0;
+        if (picked)
+            return Math.max(0, list.indexOf(picked));
+        // 正文里没有任何线索可用：按朝代优先级表挑（越靠前越优先），不再无脑取候选[0]。
+        // 只影响「默认选哪一条」，候选列表本身的顺序不动（卡片里的行序仍是原表 / 年份顺序）。
+        const byPriority = typeof D.pickByDynastyPriority === 'function'
+            ? D.pickByDynastyPriority(list) : -1;
+        return byPriority >= 0 ? byPriority : 0;
     }
     function pickInfo(mark, contextDynasty) {
         const list = candidatesOf(mark);
