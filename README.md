@@ -76,19 +76,23 @@ JavaScript、CSS、HTML 分目录；页面侧 JS 再按功能集中在 `src/js/c
 | `era`  | 年号 + 纪年数字 + 年                 | 建元三年、建元3年 |
 | `eraG` | 年号 + 干支（末尾「年」**可省略**）         | 建元甲子年、康熙甲子 |
 | `eraC` | 改元 + 年号（前置断言）                 | 改元永興      |
-| `eraR` | 年号 + 年间 / 年間 / 中 / 初 / 末 | 永興年間      |
-| `eraM` | 年号 + 中 / 初 / 末（判定**不在正则里**，见下）    | 貞觀中       |
+| `eraR` | 年号 + **年** + 间/間/中/初/末 | 永興年間、貞觀年中 |
+| `eraM` | 年号 + 间/間/中/初/末（**不带「年」**；判定**不在正则里**，见下）    | 貞觀間、貞觀中       |
 | `eraB` | 独立年号（仅 ~~`standalone` ~~开启时）  | 貞觀        |
 
 > **`eraM` 的判定条件看的是「前面」，而且判在 `hlIndex` 上、不在正则里。**
 >
-> - 原来是要求「中/初/末」后面是标点或行尾（`RANGE_TAIL`），那样会漏掉古籍里不点句读的写法 ——「太和中詔中書監」的「太和中」后面紧跟「詔」，一直标不出来。
+> - 原来是要求「中/初/末」后面是标点或行尾（当时是一个叫 `RANGE_TAIL` 的前置断言，已删除），那样会漏掉古籍里不点句读的写法 ——「太和中詔中書監」的「太和中」后面紧跟「詔」，一直标不出来。
 > - 为什么不看后面：`中書監`「中書令」这类词里也有「中」，光看后面区分不开；而前面是标点说明这里是新分句的起头，「年号+中」只可能是范围写法。
 > - **为什么不能在正则里做**：要判的是「**整段高亮起点**」前面，而高亮起点可能比年号还靠左 —— 紧挨年号的朝代 / 帝号前缀也算高亮的一部分。「。周廣順末」的起点是「周」，「。唐貞觀末」的起点是「唐」，正则里看不到这些前缀。所以 `buildRegex({range:true})` 里 `eraM` **不带任何约束**，由调用方算完 `hlIndex`（= 年号起点 − `whoPrefixLength`）之后用各自的 `isBoundary()` 过滤。
 > - ⚠️ **两个调用方必须都过滤，少一处那条路径就会误标**：`content-scanner.js` 的 `applyContextMatches`（DOM）、`canvas-adapter.js` 的 `findMatches`（识典古籍 canvas）。以后新增 `buildRegex({ range: true })` 的消费者，记得也补这一步。
-> - 保留的已知误标风险：「，開元中書舍人」会被切成「開元中」+「書舍人」（`中書X` 这类词前面正好是标点时无解）。
+> - 保留的已知误标风险：「，開元中書舍人」会被切成「開元中」+「書舍人」（`中書X` 这类词前面正好是标点时无解）；「貞觀間接影響」会被切成「貞觀間」+「接影響」（`間X` 同理，边界规则只管前面、管不了后面）。
 >
-> `eraR`（带「年」字的 `太和年間`）没有这条约束，不受影响。回归：`.workbuddy-ai/repro/check-range-head.cjs`（DOM 端到端 15 项 + canvas 侧一致性 3 项）。
+> `eraR`（带「年」字的 `太和年間`）没有这条约束，不受影响。
+>
+> **两条分支共用一份字符集**：`eras.js` 的 `RANGE_SUFFIX = '[间間中初末]'`（五个单字，一个字符类就够 —— 写成 `(?:间|間|中|初|末)` 或 `(?:[间間]|中|初|末)` 效果一样，只是多一层分组），`RANGE_FORM`（更正面板用的整串锚定版）也由它拼出来。以前是各写一遍，2026-10-23 加「間」时只改了正则、漏了 `RANGE_FORM`，结果「貞觀間」能标出来但点「更正」预填不出年号。**改这个字符集只改 `RANGE_SUFFIX` 一处。**
+>
+> 回归：`.workbuddy-ai/repro/check-range-head.cjs`（DOM 端到端 21 项 + canvas 侧一致性 3 项 + `RANGE_FORM` / 更正预填 9 项）。
 
 纪年数字 `NUM_PART` 统一限制为：`元`、中文数字 **二～六十一**（含合文 **廿 / 卅 / 卌**）、阿拉伯数字 **1～61**。中文纪年不支持「一」「零」「〇」，也不支持百、千、万。第一年统一写作「元年」。
 
@@ -155,7 +159,7 @@ JavaScript、CSS、HTML 分目录；页面侧 JS 再按功能集中在 `src/js/c
 
 **高亮带上「谁」（朝代 + 帝号）**：紧挨在「年号 + 纪年 / 范围写法」前面的朝代名、帝号也一起高亮 —— 「唐貞觀五年」「唐貞觀年間」「大唐貞觀中」整段高亮，「大唐貞觀五年」连「大」一起；带帝号的「唐僖宗廣明元年」「僖宗廣明元年」也整段高亮。规则：
 
-- **带年号的写法都扩**：`era`（年号+纪年数字）、`eraG`（年号+干支年，末尾「年」可省）、`eraR`（年号+年間 / 年間 / 年初 / 年末）、`eraM`（年号+中 / 初 / 末）。
+- **带年号的写法都扩**：`era`（年号+纪年数字）、`eraG`（年号+干支年，末尾「年」可省）、`eraR`（年号+年间 / 年間 / 年中 / 年初 / 年末）、`eraM`（年号+间 / 間 / 中 / 初 / 末）。
 - **不扩**：`eraB`（独立年号 —— 就是「只有朝代 + 年号」那种）、以及裸纪年（「只有朝代 + 纪年」，走 `applyContextMatches` 那条路）。
 - **`eraC`（改元永興）实际也扩不到**：它的匹配是从年号开始的，前面挡着「改元」两个字，`whoPrefixLength()` 看到的是「元」，自然不扩 —— 所以没把它列进条件里。
 - 判据是 `eras.js` 的 `D.whoPrefixLength(before)`（旧名 `dynastyPrefixLength`，已改名）。它按「**朝代 + 帝号** → **帝号** → **朝代**」三层依次往左吃，每一段都**必须紧挨着**：
@@ -251,7 +255,7 @@ canvas 侧另外几个要点：
 | 字段             | 含义                       |
 | -------------- | ------------------------ |
 | `__eraInfo`    | 候选数组（可能多个，见 3.2）         |
-| `__eraRange`   | 是否「年间 / 中 / 初 / 末」这类范围写法 |
+| `__eraRange`   | 是否「年间 / 间 / 中 / 初 / 末」这类范围写法 |
 | `__eraN`       | 这一处的纪年数（「三年」= 3，「元年」= 1） |
 | `__eraGz`      | 干支（「甲子年」/「康熙甲子」= 甲子）    |
 | `__eraDynasty` | 已采用的朝代（用于下文沿用）           |
@@ -922,7 +926,7 @@ NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/repro16-prompt-align.cj
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-sidepanel-ext.cjs     # 侧边栏：短年号是长年号前缀时弹建议框（建武 → 建武中元）
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-global-disable.cjs    # 「全局禁用」站点模式 + 「正则识别方式」已删除
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-theme-menu.cjs       # 色卡菜单两行（浅色 / 深色网页）+ 透明色跨两行 + *-dark 白名单与 CSS 规则
-NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-range-head.cjs       # eraM（年号+中/初/末）边界判在 hlIndex 上 + DOM 端到端 + canvas 侧一致性
+NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-range-head.cjs       # eraM（年号+间/間/中/初/末，可省「年」）边界判在 hlIndex 上 + DOM 端到端 + canvas 侧一致性 + 更正预填
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-regex-reset-alert.cjs # 「正则重置」不闪黄：快响应无黄提示 / 慢响应有 / 失败走红
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-year-zai.cjs        # 「年」写成「載 / 载」：DOM + canvas + 查询 + 更正面板 + 误标守卫
 NODE_PATH=<托管 node_modules> node .workbuddy-ai/repro/check-ganzhi-bare.cjs     # 年号+干支省略「年」（康熙甲子）+ 上元不认干支：DOM + 解析 + canvas + 更正面板 + 误标守卫

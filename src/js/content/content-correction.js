@@ -206,7 +206,7 @@
     const GANZHI_TAIL = D.GANZHI_PART;
     const CHRONO_TAIL = new RegExp('^(?:' + D.YEAR_NUM_PART + D.YEAR_MARK + '|' + GANZHI_TAIL + D.YEAR_MARK + '?)$');
     // 年号后面那一截可以是什么：空（整个标记就是年号，如「改元永興」）、
-    // 纪年（「建元三年」）、范围写法（「永興年間 / 貞觀中」）。
+    // 纪年（「建元三年」）、范围写法（「永興年間 / 貞觀間 / 貞觀中」）。
     // 少了后两种，「永興年間」这类标记点更正后输入框和候选都是空的。
     function eraTailAccepted(tail) {
         if (!tail)

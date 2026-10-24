@@ -163,6 +163,25 @@
     //            content-annotation.js 抽年数，content-correction.js 的纪年尾巴，
     //            era-search.js / sidepanel.js 的查询解析。
     const YEAR_MARK = '(?:年|載|载)';
+    // 范围写法的「尾巴」：间 / 間（简繁）· 中 · 初 · 末 —— 五个单字，一个字符类就够。
+    // 写成 `(?:间|間|中|初|末)` 或 `(?:[间間]|中|初|末)` 效果一样，只是多一层分组和竖线。
+    //
+    // ⚠️ 这个常量里**只放那五个字，不放「年」**。原因是它要同时插进两个位置：
+    //      eraR = 年号 + '年' + RANGE_SUFFIX   ← 前面已经有「年」了
+    //      eraM = 年号 +        RANGE_SUFFIX   ← 前面**不能**有「年」（「貞觀間」就是这种）
+    //    一旦把「年」写进常量（比如抄成 `(?:年[间間]|中|初|末)`），eraR 会拼出
+    //    `年(?:年[间間]|…)`，只有「貞觀年年間」才匹配；而 eraM 又会要求先有「年」，
+    //    「貞觀間」反而不认了 —— 两个方向同时坏掉。
+    //    所以「年」由**调用处**各自处理：eraR 自己写 `'年'`，RANGE_FORM 用 `年?`。
+    //
+    // 同一份定义供两处用，别再各写一遍 —— 2026-10-23 就是各写一遍，加「間」时只改了正则、
+    // 漏了 `RANGE_FORM`，结果「貞觀間」标出来了但点「更正」预填不出年号。
+    //   RANGE_SUFFIX —— buildRegex 的 eraR / eraM 分支（正则片段，不带锚点、不含「年」）
+    //   RANGE_FORM —— 更正面板的 eraTailAccepted()（判「年号后面那一截」合不合法，整串锚定）
+    // 「貞觀年間」和「貞觀間」是一个意思，古籍里两种都常见。
+    // ⚠️ 带「年」的（eraR）不做边界检查，不带「年」的（eraM）要做 —— 见 buildRegex 上面的说明。
+    const RANGE_SUFFIX = '[间間中初末时時]';
+    const RANGE_FORM = new RegExp('^(?:年?' + RANGE_SUFFIX + ')$');
     // 「光秃秃的年号 + 干支」里**不认**的年号（用户 2026-10-18 要求）。
     //
     // 为什么单拎出「上元」：历法术数里「上元甲子 / 上元乙丑…」指的是三元九运的**起算点**
@@ -196,7 +215,14 @@
             return false;
         return !ERA_G_YEAR_TAIL.test(String(matched == null ? '' : matched));
     }
-    // 「年号 + 中/初/末」（不带「年」字）这里**不加任何边界约束** —— 约束放在调用方做。
+    // 「年号 + 中/初/末/间/間」（**「年」可有可无**）这里**不加任何边界约束** —— 约束放在调用方做。
+    //
+    // 两条分支（都在 `opts.range` 为真时才加）：
+    //   eraR = 年号 + 「年」 + RANGE_SUFFIX   →「貞觀年間 / 貞觀年中 / 貞觀年初」
+    //   eraM = 年号 +        RANGE_SUFFIX   →「貞觀間 / 貞觀中 / 貞觀初 / 貞觀末」
+    // 拆成两个命名组**不是冗余**：只有不带「年」的 eraM 需要额外做边界检查（见下），
+    // 带「年」的 eraR 有强信号、不用查。合并成一个组就没法只对一半生效了。
+    // 两条共用 `RANGE_SUFFIX` 那一份定义，改字符集时只改那里。
     //
     // 为什么不能在正则里做：要看的是「整段高亮起点」前面是不是标点，而高亮起点可能比年号还靠左
     // —— 紧挨在年号前面的朝代 / 帝号前缀也算高亮的一部分：「。周广顺末」的高亮起点是「周」，
@@ -230,7 +256,8 @@
         // 改元 + 年号
         parts.push('(?<=改元)' + SP + '(?<eraC>' + NAME_PART + ')');
         if (opts && opts.range) {
-            parts.push('(?<eraR>' + NAME_PART + ')' + SP + '年(?:间|間|中|初|末)', '(?<eraM>' + NAME_PART + ')' + SP + '(?:中|初|末)');
+            parts.push('(?<eraR>' + NAME_PART + ')' + SP + '年' + RANGE_SUFFIX,
+                '(?<eraM>' + NAME_PART + ')' + SP + RANGE_SUFFIX);
         }
         if (standalone)
             parts.push('(?<eraB>' + NAME_PART + ')');
@@ -589,8 +616,7 @@
             offset: Number.isFinite(best.offset) && best.offset >= 1 ? best.offset : 1
         };
     }
-    // 与 buildRegex 的 eraR/eraM 分支保持一致：简繁两种「间」都要算范围写法。
-    const RANGE_FORM = /(?:年[间間]|中|初|末)$/;
+    // RANGE_FORM 与 buildRegex 的 eraR/eraM 共用同一份 `RANGE_SUFFIX` 定义，定义在文件上方。
     global.EraData = {
         rangeOf: rangeOf,
         RANGE_FORM: RANGE_FORM,
